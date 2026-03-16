@@ -1,0 +1,1 @@
+export const SMS_PROVIDER_TOKEN = Symbol('SMS_PROVIDER_TOKEN');
