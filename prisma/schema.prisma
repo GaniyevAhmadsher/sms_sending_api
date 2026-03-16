@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum SmsStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum TransactionType {
+  TOPUP
+  SMS_DEDUCTION
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  passwordHash   String?
+  googleId       String?        @unique
+  name           String?
+  balance        Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  apiKeys        ApiKey[]
+  smsMessages    SmsMessage[]
+  transactions   Transaction[]
+  usageLogs      UsageLog[]
+}
+
+model ApiKey {
+  id           String       @id @default(cuid())
+  userId       String
+  keyHash      String       @unique
+  label        String
+  status       ApiKeyStatus @default(ACTIVE)
+  lastUsedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  revokedAt    DateTime?
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+}
+
+model SmsMessage {
+  id            String     @id @default(cuid())
+  userId        String
+  toPhoneNumber String
+  body          String
+  provider      String
+  providerRef   String?
+  status        SmsStatus  @default(QUEUED)
+  errorMessage  String?
+  createdAt     DateTime   @default(now())
+  sentAt        DateTime?
+  user          User       @relation(fields: [userId], references: [id])
+
+  @@index([userId, status, createdAt])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  type        TransactionType
+  amount      Decimal         @db.Decimal(12, 2)
+  description String
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model UsageLog {
+  id          String   @id @default(cuid())
+  userId      String
+  endpoint    String
+  method      String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, endpoint, createdAt])
+}
