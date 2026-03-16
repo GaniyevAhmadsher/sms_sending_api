@@ -6,13 +6,9 @@ import * as crypto from 'crypto';
 export class ApiKeysService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, label?: string, rateLimitRpm?: number) {
+  async create(userId: string, label?: string) {
     if (label && label.length > 50) {
       throw new BadRequestException('Label too long');
-    }
-
-    if (rateLimitRpm && (rateLimitRpm < 1 || rateLimitRpm > 10000)) {
-      throw new BadRequestException('Invalid rateLimitRpm');
     }
 
     const rawKey = `sms_${crypto.randomBytes(24).toString('hex')}`;
@@ -23,9 +19,8 @@ export class ApiKeysService {
         userId,
         keyHash,
         label: label ?? 'default',
-        rateLimitRpm: rateLimitRpm ?? 60,
       },
-      select: { id: true, label: true, rateLimitRpm: true, createdAt: true },
+      select: { id: true, label: true, createdAt: true },
     });
 
     return { ...apiKey, apiKey: rawKey };

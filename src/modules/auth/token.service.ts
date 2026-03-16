@@ -1,16 +1,15 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
-import { AppConfigService } from '../../infrastructure/config/app-config.service';
 
 @Injectable()
 export class TokenService {
-  constructor(private readonly config: AppConfigService) {}
+  private readonly secret = process.env.JWT_SECRET ?? 'dev-secret';
 
   sign(payload: { sub: string; email: string; exp?: number }) {
     const exp = payload.exp ?? Math.floor(Date.now() / 1000) + 60 * 60 * 24;
     const body = Buffer.from(JSON.stringify({ ...payload, exp })).toString('base64url');
     const signature = crypto
-      .createHmac('sha256', this.config.jwtSecret)
+      .createHmac('sha256', this.secret)
       .update(body)
       .digest('base64url');
     return `${body}.${signature}`;
@@ -19,7 +18,7 @@ export class TokenService {
   verify(token: string): { sub: string; email: string; exp: number } {
     const [body, signature] = token.split('.');
     const expected = crypto
-      .createHmac('sha256', this.config.jwtSecret)
+      .createHmac('sha256', this.secret)
       .update(body)
       .digest('base64url');
 

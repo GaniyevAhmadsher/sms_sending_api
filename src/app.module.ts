@@ -11,21 +11,10 @@ import { QueueModule } from './modules/queue/queue.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
-import { ConfigModule } from './infrastructure/config/config.module';
-import { RedisModule } from './infrastructure/redis/redis.module';
-import { QueueConnectionModule } from './infrastructure/queue/queue-connection.module';
-import { RateLimitModule } from './infrastructure/rate-limit/rate-limit.module';
-import { GlobalThrottleGuard } from './infrastructure/rate-limit/global-throttle.guard';
-import { HealthModule } from './modules/health/health.module';
-import { DocsModule } from './infrastructure/docs/docs.module';
 
 @Module({
   imports: [
-    ConfigModule,
     PrismaModule,
-    RedisModule,
-    QueueConnectionModule,
-    RateLimitModule,
     AuthModule,
     UsersModule,
     ApiKeysModule,
@@ -34,8 +23,6 @@ import { DocsModule } from './infrastructure/docs/docs.module';
     BillingModule,
     SmsModule,
     AnalyticsModule,
-    HealthModule,
-    DocsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,28 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { HealthController } from './../src/modules/health/health.controller';
-import { HealthService } from './../src/modules/health/health.service';
+import { AppController } from './../src/app.controller';
+import { AppService } from './../src/app.service';
 
-describe('HealthController (e2e)', () => {
+describe('AppController (e2e)', () => {
   let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [HealthController],
-      providers: [
-        {
-          provide: HealthService,
-          useValue: {
-            check: async () => ({
-              service: 'sms-sending-api',
-              status: 'ok',
-              database: 'up',
-              redis: 'up',
-            }),
-          },
-        },
-      ],
+      controllers: [AppController],
+      providers: [AppService],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -30,11 +18,9 @@ describe('HealthController (e2e)', () => {
   });
 
   it('/health (GET)', () => {
-    return request(app.getHttpServer()).get('/health').expect(200).expect({
-      service: 'sms-sending-api',
-      status: 'ok',
-      database: 'up',
-      redis: 'up',
-    });
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect({ status: 'ok', service: 'sms-sending-api' });
   });
 });

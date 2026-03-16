@@ -6,16 +6,14 @@ export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSmsStats(userId: string) {
-    const [total, pending, queued, sent, failed, delivered] = await Promise.all([
+    const [total, sent, failed, queued] = await Promise.all([
       this.prisma.smsMessage.count({ where: { userId } }),
-      this.prisma.smsMessage.count({ where: { userId, status: 'PENDING' } }),
-      this.prisma.smsMessage.count({ where: { userId, status: 'QUEUED' } }),
       this.prisma.smsMessage.count({ where: { userId, status: 'SENT' } }),
       this.prisma.smsMessage.count({ where: { userId, status: 'FAILED' } }),
-      this.prisma.smsMessage.count({ where: { userId, status: 'DELIVERED' } }),
+      this.prisma.smsMessage.count({ where: { userId, status: 'QUEUED' } }),
     ]);
 
-    return { total, pending, queued, sent, failed, delivered };
+    return { total, sent, failed, queued };
   }
 
   async getUsageLogs(userId: string, limit = 50) {

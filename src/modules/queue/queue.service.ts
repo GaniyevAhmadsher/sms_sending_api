@@ -1,24 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
-import { QueueConnectionService } from '../../infrastructure/queue/queue-connection.service';
-import { SMS_QUEUE } from './queue.constants';
+import { SmsProcessor } from './sms.processor';
 
 @Injectable()
 export class QueueService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly queueConnection: QueueConnectionService,
-  ) {}
+  constructor(private readonly smsProcessor: SmsProcessor) {}
 
-  async enqueueSmsJob(payload: { smsId: string }) {
-    await this.prisma.smsMessage.update({
-      where: { id: payload.smsId },
-      data: {
-        status: 'QUEUED',
-        queuedAt: new Date(),
-      },
-    });
-
-    await this.queueConnection.publish(SMS_QUEUE, payload);
+  async enqueueSmsJob(payload: { smsId: string; userId: string; to: string; body: string }) {
+    setTimeout(() => {
+      void this.smsProcessor.process(payload);
+    }, 0);
   }
 }

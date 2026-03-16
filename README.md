@@ -1,49 +1,43 @@
 # SMS Sending SaaS API
 
-Production-ready modular NestJS backend for SMS sending with API keys, auth, queue processing, billing, analytics, rate limiting, and health checks.
+Production-oriented NestJS backend for multi-tenant SMS delivery with API-key based sending, JWT auth, queue-based dispatching, billing, and analytics.
 
-## Tech
-- NestJS
-- Prisma + PostgreSQL
-- Redis
-- BullMQ-oriented queue module design
+## Stack
+- NestJS + TypeScript
+- Prisma ORM + PostgreSQL
+- Redis + BullMQ
 
 ## Modules
-- `auth`: register/login/google login, token issuing
-- `users`: user profile
-- `api-keys`: create/revoke API keys, API key auth + per-key throttling
-- `sms`: send SMS, status query, delivery update
-- `billing`: balance + transaction history
-- `analytics`: statistics and usage logs
-- `providers`: provider abstraction + mock provider
-- `queue`: SMS queue service + worker processor
-- `health`: service/database/redis health
-- `infrastructure`: config, docs, redis, queue connection, throttling
+- `auth` (JWT, registration/login, Google OAuth token exchange)
+- `users` (profile)
+- `api-keys` (create/revoke keys, API key guard)
+- `sms` (`POST /sms/send` with validation and queueing)
+- `queue` (BullMQ queue + worker)
+- `providers` (provider abstraction + mock provider)
+- `billing` (balance + transaction logging)
+- `analytics` (SMS stats + usage logs)
 
-## API docs
-- `GET /docs` (human-readable docs)
-- `GET /openapi.json` (OpenAPI spec)
+## Environment variables
+Create `.env`:
 
-## Environment
-Use `.env.example` and set:
-- `DATABASE_URL`
-- `REDIS_HOST`
-- `REDIS_PORT`
-- `JWT_SECRET`
-- `SMS_PROVIDER`
-
-## SMS flow
-Client Request -> API Key Guard -> API Key Rate Limit -> Balance Check -> Save Message (PENDING) -> Queue Job (QUEUED) -> Worker Send SMS -> Update Status (SENT/FAILED/DELIVERED)
-
-## Prisma migrations
-```bash
-npx prisma generate
-npx prisma migrate deploy
+```env
+PORT=3000
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sms_api
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=
+JWT_SECRET=change_me
+JWT_EXPIRES_IN=1d
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
 ```
 
 ## Run
 ```bash
 npm install
-npm run build
+npx prisma generate
 npm run start:dev
 ```
+
+## Notes
+- `POST /sms/send` requires `x-api-key` header.
+- Dashboard-like endpoints (`/users/me`, `/billing/*`, `/analytics/*`) use JWT bearer auth.

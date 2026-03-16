@@ -7,14 +7,7 @@ import { SMS_PROVIDER_TOKEN } from './providers.constants';
     MockSmsProvider,
     {
       provide: SMS_PROVIDER_TOKEN,
-      useFactory: (mock: MockSmsProvider) => {
-        const selected = process.env.SMS_PROVIDER ?? 'mock';
-        if (selected !== 'mock') {
-          return mock;
-        }
-        return mock;
-      },
-      inject: [MockSmsProvider],
+      useExisting: MockSmsProvider,
     },
   ],
   exports: [SMS_PROVIDER_TOKEN],

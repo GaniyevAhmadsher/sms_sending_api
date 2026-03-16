@@ -14,12 +14,11 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('index', () => {
-    it('should return service metadata', () => {
-      expect(appController.index()).toEqual({
+  describe('health', () => {
+    it('should return health payload', () => {
+      expect(appController.health()).toEqual({
+        status: 'ok',
         service: 'sms-sending-api',
-        version: '1.0.0',
-        docs: '/docs',
       });
     });
   });

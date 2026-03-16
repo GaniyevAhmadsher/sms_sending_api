@@ -3,12 +3,11 @@ import { SmsController } from './sms.controller';
 import { SmsService } from './sms.service';
 import { QueueModule } from '../queue/queue.module';
 import { BillingModule } from '../billing/billing.module';
-import { ApiKeysModule } from '../api-keys/api-keys.module';
-import { ApiKeyRateLimitGuard } from '../api-keys/guards/api-key-rate-limit.guard';
+import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
 
 @Module({
-  imports: [QueueModule, BillingModule, ApiKeysModule],
+  imports: [QueueModule, BillingModule],
   controllers: [SmsController],
-  providers: [SmsService, ApiKeyRateLimitGuard],
+  providers: [SmsService, ApiKeyGuard],
 })
 export class SmsModule {}

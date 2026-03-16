@@ -36,7 +36,6 @@ export class ApiKeyGuard implements CanActivate {
       id: candidate.user.id,
       email: candidate.user.email,
       apiKeyId: candidate.id,
-      rateLimitRpm: candidate.rateLimitRpm,
     };
 
     await this.prisma.apiKey.update({
