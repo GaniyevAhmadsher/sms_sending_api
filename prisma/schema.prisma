@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum SmsStatus {
+  PENDING
+  QUEUED
+  SENT
+  FAILED
+  DELIVERED
+}
+
+enum TransactionType {
+  TOPUP
+  SMS_DEDUCTION
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String?
+  googleId      String?       @unique
+  name          String?
+  balance       Decimal       @default(0) @db.Decimal(14, 4)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  apiKeys       ApiKey[]
+  smsMessages   SmsMessage[]
+  transactions  Transaction[]
+  usageLogs     UsageLog[]
+
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id           String       @id @default(cuid())
+  userId       String
+  keyHash      String       @unique
+  label        String
+  status       ApiKeyStatus @default(ACTIVE)
+  rateLimitRpm Int          @default(60)
+  lastUsedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  revokedAt    DateTime?
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, lastUsedAt])
+}
+
+model SmsMessage {
+  id            String    @id @default(cuid())
+  userId        String
+  apiKeyId      String?
+  toPhoneNumber String
+  body          String
+  provider      String
+  providerRef   String?
+  status        SmsStatus @default(PENDING)
+  errorMessage  String?
+  cost          Decimal   @default(1) @db.Decimal(14, 4)
+  createdAt     DateTime  @default(now())
+  queuedAt      DateTime?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([apiKeyId, createdAt(sort: Desc)])
+  @@index([toPhoneNumber, createdAt(sort: Desc)])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  type        TransactionType
+  amount      Decimal         @db.Decimal(14, 4)
+  description String
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+}
+
+model UsageLog {
+  id            String   @id @default(cuid())
+  userId        String?
+  apiKeyId      String?
+  endpoint      String
+  method        String
+  statusCode    Int?
+  requestId     String?
+  ipAddress     String?
+  userAgent     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([apiKeyId, endpoint, createdAt(sort: Desc)])
+  @@index([userId, endpoint, createdAt(sort: Desc)])
+}

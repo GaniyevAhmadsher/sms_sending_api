@@ -14,9 +14,13 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+  describe('index', () => {
+    it('should return service metadata', () => {
+      expect(appController.index()).toEqual({
+        service: 'sms-sending-api',
+        version: '1.0.0',
+        docs: '/docs',
+      });
     });
   });
 });
