@@ -1,93 +1,114 @@
 # Technical Audit Report — SMS Sending SaaS Backend
 
 Date: 2026-03-17
-Scope: Full repository audit before payment integration
 
-## Overall Score: 43 / 100
+## 1) Overall Score
 
-## 1) Strengths
-- Clear modular folder layout (`auth`, `users`, `api-keys`, `sms`, `queue`, `providers`, `billing`, `analytics`).
-- API keys are stored hashed (not plaintext), with revocation metadata and last-used tracking.
-- Billing deduction and transaction creation are wrapped in a single DB transaction.
-- Provider abstraction exists (`SmsProvider` interface + token-based injection), allowing a clean path to add real providers.
+**41 / 100**
 
-## 2) Critical Issues (must fix before production)
-1. **Build is currently broken** (`GlobalThrottleGuard` referenced but not imported in `AppModule`).
-2. **Config DI is incomplete in root module** (`AppConfigService` is consumed in bootstrap but `ConfigModule` is not imported by `AppModule`).
-3. **Custom token format is not JWT compliant and misses standard claims/signing guarantees**.
-4. **Password hashing is insecure for production** (HMAC-SHA256 with static secret; no salt/work-factor like Argon2/bcrypt).
-5. **DTO validation framework is not used** (no `class-validator` decorators, no global `ValidationPipe`).
-6. **SMS billing and message creation are non-atomic**: SMS row is created before deduction; failure can leave orphan/incorrect lifecycle state.
-7. **Queue implementation is in-memory (`setTimeout`) not BullMQ**: no durability, retries, backoff, visibility timeout, or worker isolation.
-8. **Prisma schema is out of sync with migration and code expectations** (fields/enums differ materially).
-9. **Rate-limit guard for API keys exists but is never applied to `/sms/send`**.
-10. **No idempotency strategy on send endpoint** (duplicate client retries can cause duplicate charges/messages).
+## 2) Strengths
 
-## 3) Medium Issues (should improve)
-- Error taxonomy is inconsistent (mix of `BadRequestException` for business errors that should be `Conflict`/`Payment Required` style domain mapping).
-- Prisma service uses `any`, removing compile-time safety from data access.
-- No observable correlation IDs / structured request logging for operational forensics.
-- Rate limiter is fail-open on Redis failure; may be acceptable temporarily but risky in abuse scenarios.
-- Provider result model has no delivery callbacks/status transitions (e.g., queued/sent/delivered) despite migration hinting delivered lifecycle.
+- Clear modular domain boundaries exist (`auth`, `users`, `api-keys`, `sms`, `queue`, `billing`, `providers`, `analytics`).
+- Basic tenant isolation is applied in many query paths via `userId` scoping.
+- Billing deduction uses a database transaction wrapper (`$transaction`) instead of detached updates.
+- Provider layer already introduces an interface/token abstraction and a mock implementation, which is a good foundation.
 
-## 4) Minor Issues (optional improvements)
-- README claims BullMQ/Redis queue worker but implementation is not BullMQ.
-- Env docs mention `JWT_EXPIRES_IN` and `REDIS_PASSWORD`, but config service does not expose/use them.
-- Analytics is minimal and lacks percentile latency/provider-level cost and success metrics.
+## 3) Critical Issues (must fix before production)
 
-## 5) Security Risks
-- Weak password hashing strategy (high risk).
-- Non-standard JWT increases interoperability and security maintenance risk.
-- Missing systematic DTO validation and transform/whitelist behavior.
-- Default fallback secrets (`dev-secret`, `password-secret`, `api-key-secret`) are dangerous in prod if env is misconfigured.
-- API key hash secret fallback also weakens blast radius in accidental prod defaults.
+1. **Application bootstrap/import graph is broken**
+   - `AppModule` references `GlobalThrottleGuard` without importing it, which will fail TypeScript build.
+   - `main.ts` requests `AppConfigService`, but `ConfigModule` is not imported in `AppModule`, and no env loader exists.
 
-## 6) Scalability Risks
-- In-memory queue prevents horizontal scaling and loses jobs on process crash/redeploy.
-- No outbox/idempotency key means retries from clients/load balancers can multiply jobs and charges.
-- Billing balance check + decrement susceptible to race conditions under concurrent send requests.
-- Lack of partitioning/retention strategy for `usageLog` and `smsMessage` growth.
+2. **JWT implementation is custom and non-standard/insecure by platform expectations**
+   - Token format is a custom `base64(payload).hmac` (no JWT header, no standard validation controls, no key rotation, no `iss`/`aud` semantics).
+   - Signature comparison is not constant-time and is vulnerable to timing-analysis style attacks.
 
-## 7) Readiness Level
-**NOT READY** for payment integration.
+3. **Password/API-key secrets have insecure defaults and weak crypto strategy**
+   - Password hashing uses plain HMAC-SHA256 with global secret (fast hash, no salt/work factor).
+   - API key hashing uses fallback default secret if env variable is missing.
+   - JWT secret also defaults to weak development value.
 
-Rationale: correctness, security, and reliability gaps (auth/token, queue durability, schema drift, transactional consistency) are too high-risk to safely layer financial flows (Click/Payme) on top.
+4. **Queue system is not BullMQ-backed and is non-durable**
+   - Queue implementation uses `setTimeout(..., 0)` in-process, so jobs are lost on crash/restart and not horizontally scalable.
+   - No retries/backoff/dead-letter strategy.
+
+5. **Billing-SMS consistency is non-atomic across modules**
+   - SMS record creation, billing deduction, and enqueue operation happen in separate operations without one transaction boundary.
+   - Failures after deduction may charge user without successful enqueue.
+
+6. **Schema, migration, and code are inconsistent (serious drift risk)**
+   - Migration defines fields not present in Prisma schema (`rateLimitRpm`, `apiKeyId`, `cost`, `queuedAt`, `deliveredAt`, etc.).
+   - Code selects `rateLimitRpm` but schema model `ApiKey` does not define it.
+   - Migration enum `SmsStatus` includes values not in schema enum (`PENDING`, `DELIVERED`).
+
+7. **DTO validation layer is effectively absent**
+   - DTOs have no `class-validator` decorators and global validation pipe is not configured, allowing malformed payloads.
+
+## 4) Medium Issues (should improve)
+
+1. `SmsService` performs manual payload validation and duplicates validation concern that should live in DTO + pipe.
+2. `ApiKeyGuard` updates `lastUsedAt` on every request synchronously; this adds write amplification to the hot path.
+3. Usage logging is partial (only `/sms/send` service writes logs; no centralized interceptor/middleware).
+4. Google token verification depends on external tokeninfo endpoint directly in auth service (latency/failure coupling).
+5. Health module exists but is not wired in `AppModule`; health response expectations are inconsistent across controllers.
+
+## 5) Minor Issues (optional improvements)
+
+1. Inconsistent architectural intent: infrastructure modules (`redis`, `queue-connection`, `rate-limit`, `docs`, `health`) are present but only partially integrated.
+2. Naming/metadata consistency can be improved (service name repeated in multiple places).
+3. Add pagination and strict caps for analytics/transactions endpoints to avoid large payloads over time.
+
+## 6) Security Risks
+
+- Weak password hashing primitive (fast hash, no per-user salt/work factor).
+- Insecure default secrets in production-misconfig scenario.
+- Custom JWT implementation misses hardened library-level protections and best-practice claims.
+- Missing global validation/sanitization pipeline increases abuse surface.
+- No explicit authorization policy layer beyond simple user scoping.
+
+## 7) Scalability Risks
+
+- In-memory queue (`setTimeout`) prevents horizontal worker scaling and durability.
+- Synchronous DB writes in guards (`lastUsedAt`) can become bottlenecks under API-key traffic.
+- Lack of idempotency keys/dedupe strategy can produce duplicate sends if clients retry.
+- Billing and SMS state transitions are not orchestrated by a robust state machine/event workflow.
 
 ## 8) Concrete Fix Recommendations
 
-### A. Platform correctness first (blocker)
-1. Fix compilation and dependency graph:
-   - Import `GlobalThrottleGuard` in `AppModule`.
-   - Import `ConfigModule`, `RateLimitModule`, `RedisModule` into root module where needed.
-2. Align Prisma artifacts:
-   - Reconcile `schema.prisma` with migration and with runtime code (`rateLimitRpm`, `apiKeyId`, `cost`, richer statuses).
-   - Regenerate Prisma client and enforce typed Prisma service.
+1. **Stabilize foundation first (compile/runtime)**
+   - Import and wire required infrastructure modules in `AppModule`: config, redis, rate-limit, health, etc.
+   - Add strict startup config validation (`zod`/`joi`) and fail fast on missing secrets.
 
-### B. Security hardening (blocker)
-1. Replace custom token with `@nestjs/jwt` using standard JWT header/payload/signature.
-2. Replace password hashing with Argon2id (`argon2`) or bcrypt with calibrated cost.
-3. Enforce global input validation:
-   - `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`
-   - Add `class-validator` decorators to all DTOs.
-4. Remove insecure default secrets in production path (fail-fast when missing required env vars).
+2. **Replace auth/crypto primitives**
+   - Use `@nestjs/jwt` + `passport-jwt` for token handling.
+   - Use Argon2id (or bcrypt with strong cost) for passwords.
+   - Hash API keys with SHA-256 only as lookup hash + random key generation; require non-default secret or use pepper via secret manager.
+   - Add key rotation strategy and `kid` support for JWT if needed.
 
-### C. SMS/Billing reliability (blocker)
-1. Make send flow atomic:
-   - In one transaction: lock user row, verify balance, decrement, create transaction record, create SMS in `PENDING/QUEUED`.
-2. Add idempotency key on `/sms/send`:
-   - unique `(userId, idempotencyKey)` constraint and return previous result on replay.
-3. Implement durable queue with BullMQ:
-   - Named jobs, retry/backoff policy, dead-letter queue, attempts, and stalled job handling.
-4. Introduce status progression:
-   - `PENDING -> QUEUED -> SENT/FAILED -> DELIVERED` (when provider callbacks are integrated).
+3. **Implement real BullMQ flow**
+   - Use Redis-backed queue, separate worker process, retries/backoff, dead-letter queue.
+   - Persist lifecycle timestamps (`queuedAt`, `sentAt`, `failedAt`) and attempt counts.
 
-### D. Abuse protection / ops
-1. Apply `ApiKeyRateLimitGuard` on SMS endpoints.
-2. Decide fail-open vs fail-closed policy per endpoint sensitivity.
-3. Add structured logs (requestId, userId/apiKeyId, smsId, providerRef).
+4. **Enforce atomic billing/send orchestration**
+   - Use one DB transaction to: validate balance, reserve/decrement balance, create SMS with initial state, create billing transaction, enqueue outbox event.
+   - Prefer outbox pattern for guaranteed publish and eventual processing.
 
-### E. Testing expansion before payments
-1. Unit tests: auth/token, API key guard, billing race conditions, SMS validation.
-2. Integration tests with DB+Redis containers for send flow transactionality.
-3. Worker tests for retry, poison message handling, duplicate job/idempotency behavior.
-4. E2E scenarios: insufficient balance, invalid API key, queue failure rollback, duplicate idempotency key.
+5. **Resolve Prisma drift immediately**
+   - Align `schema.prisma` with actual desired production model and regenerate clean migration set.
+   - Add missing constraints/indexes: dedupe keys, query-path indexes, optional partial indexes for active records.
+
+6. **Harden API input and error handling**
+   - Add global `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, `transform`.
+   - Decorate all DTOs with strict validators.
+   - Standardize error response format via global exception filter.
+
+7. **Observability/testing before payments**
+   - Add structured logging with correlation/request IDs.
+   - Add unit tests for billing race/concurrency, auth edge-cases, queue retry behavior.
+   - Add e2e tests for auth → api-key → send SMS flow and failure scenarios.
+
+## 9) Readiness Level
+
+**NOT READY**
+
+The system should **not** proceed to payment integration yet. Payment integration (Click/Payme) will amplify transactional and security risks; the current architecture has unresolved critical correctness, durability, and security gaps.
