@@ -22,7 +22,13 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Missing API key');
     }
 
-    const keyHash = this.apiKeysService.hashApiKey(apiKey);
+    let keyHash: string;
+    try {
+      keyHash = this.apiKeysService.hashApiKey(apiKey);
+    } catch {
+      throw new UnauthorizedException('Invalid API key');
+    }
+
     const candidate = await this.prisma.apiKey.findFirst({
       where: { keyHash, status: 'ACTIVE' },
       include: { user: true },

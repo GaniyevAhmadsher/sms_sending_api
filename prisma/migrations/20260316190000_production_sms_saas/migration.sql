@@ -99,6 +99,7 @@ CREATE INDEX "SmsMessage_userId_createdAt_idx" ON "SmsMessage"("userId", "create
 CREATE INDEX "SmsMessage_status_createdAt_idx" ON "SmsMessage"("status", "createdAt" DESC);
 CREATE INDEX "SmsMessage_apiKeyId_createdAt_idx" ON "SmsMessage"("apiKeyId", "createdAt" DESC);
 CREATE INDEX "SmsMessage_toPhoneNumber_createdAt_idx" ON "SmsMessage"("toPhoneNumber", "createdAt" DESC);
+CREATE UNIQUE INDEX "SmsMessage_userId_idempotencyKey_key" ON "SmsMessage"("userId", "idempotencyKey");
 
 CREATE INDEX "Transaction_userId_createdAt_idx" ON "Transaction"("userId", "createdAt" DESC);
 CREATE INDEX "Transaction_type_createdAt_idx" ON "Transaction"("type", "createdAt" DESC);
@@ -112,3 +113,6 @@ ALTER TABLE "ApiKey" ADD CONSTRAINT "ApiKey_userId_fkey" FOREIGN KEY ("userId") 
 ALTER TABLE "SmsMessage" ADD CONSTRAINT "SmsMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "UsageLog" ADD CONSTRAINT "UsageLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "SmsMessage" ADD CONSTRAINT "SmsMessage_apiKeyId_fkey" FOREIGN KEY ("apiKeyId") REFERENCES "ApiKey"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "UsageLog" ADD CONSTRAINT "UsageLog_apiKeyId_fkey" FOREIGN KEY ("apiKeyId") REFERENCES "ApiKey"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import * as crypto from 'crypto';
+import { RegisterDto } from './dto/register.dto';
 import { TokenService } from './token.service';
+import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +14,11 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     this.validateCredentials(dto.email, dto.password);
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing) {
+      throw new BadRequestException('Email already registered');
+    }
+
     const passwordHash = this.hashPassword(dto.password);
     const user = await this.prisma.user.create({
       data: { email: dto.email, name: dto.name, passwordHash },
@@ -25,7 +30,7 @@ export class AuthService {
   async login(dto: LoginDto) {
     this.validateCredentials(dto.email, dto.password);
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user?.passwordHash || user.passwordHash !== this.hashPassword(dto.password)) {
+    if (!user?.passwordHash || !this.verifyPassword(dto.password, user.passwordHash)) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -67,8 +72,20 @@ export class AuthService {
   }
 
   private hashPassword(password: string) {
-    const secret = process.env.PASSWORD_HASH_SECRET ?? 'password-secret';
-    return crypto.createHmac('sha256', secret).update(password).digest('hex');
+    const salt = randomBytes(16).toString('hex');
+    const hash = scryptSync(password, salt, 64).toString('hex');
+    return `${salt}:${hash}`;
+  }
+
+  private verifyPassword(password: string, stored: string) {
+    const [salt, hash] = stored.split(':');
+    if (!salt || !hash) {
+      return false;
+    }
+
+    const hashedBuffer = Buffer.from(scryptSync(password, salt, 64).toString('hex'), 'utf8');
+    const storedBuffer = Buffer.from(hash, 'utf8');
+    return hashedBuffer.length === storedBuffer.length && timingSafeEqual(hashedBuffer, storedBuffer);
   }
 
   private validateCredentials(email: string, password: string) {
