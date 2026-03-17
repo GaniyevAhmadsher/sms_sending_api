@@ -1,36 +1,50 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
+type TransactionClient = Parameters<PrismaService['$transaction']>[0] extends (
+  tx: infer T,
+) => Promise<unknown>
+  ? T
+  : never;
+
 @Injectable()
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async chargeSmsInTransaction(
+    tx: TransactionClient,
+    userId: string,
+    smsId: string,
+    cost = 1,
+  ) {
+    const updated = await tx.user.updateMany({
+      where: {
+        id: userId,
+        balance: { gte: cost },
+      },
+      data: {
+        balance: { decrement: cost },
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new BadRequestException('Insufficient balance');
+    }
+
+    await tx.transaction.create({
+      data: {
+        userId,
+        type: 'SMS_DEDUCTION',
+        amount: cost,
+        description: `SMS charge for message ${smsId}`,
+        metadata: { smsId, cost },
+      },
+    });
+  }
+
   async deductForSms(userId: string, smsId: string, cost = 1) {
     return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
-
-      if (Number(user.balance) < cost) {
-        throw new BadRequestException('Insufficient balance');
-      }
-
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          balance: { decrement: cost },
-        },
-      });
-
-      await tx.transaction.create({
-        data: {
-          userId,
-          type: 'SMS_DEDUCTION',
-          amount: cost,
-          description: `SMS charge for message ${smsId}`,
-        },
-      });
+      await this.chargeSmsInTransaction(tx, userId, smsId, cost);
     });
   }
 }

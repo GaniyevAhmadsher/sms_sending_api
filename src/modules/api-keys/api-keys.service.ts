@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import * as crypto from 'crypto';
+import { AppConfigService } from '../../infrastructure/config/app-config.service';
 
 @Injectable()
 export class ApiKeysService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: AppConfigService,
+  ) {}
 
   async create(userId: string, label?: string) {
     if (label && label.length > 50) {
       throw new BadRequestException('Label too long');
     }
-
     const rawKey = `sms_${crypto.randomBytes(24).toString('hex')}`;
     const keyHash = this.hashApiKey(rawKey);
 
@@ -40,7 +43,13 @@ export class ApiKeysService {
   }
 
   hashApiKey(key: string) {
-    const secret = process.env.API_KEY_HASH_SECRET ?? 'api-key-secret';
-    return crypto.createHmac('sha256', secret).update(key).digest('hex');
+    if (!key.startsWith('sms_')) {
+      throw new BadRequestException('Malformed API key');
+    }
+
+    return crypto
+      .createHmac('sha256', this.config.apiKeyHashSecret)
+      .update(key)
+      .digest('hex');
   }
 }

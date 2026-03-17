@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { QueueService } from './queue.service';
-import { SmsProcessor } from './sms.processor';
 import { ProvidersModule } from '../providers/providers.module';
+import { SmsProcessor } from './sms.processor';
+import { QueueService } from './queue.service';
 
 @Module({
   imports: [ProvidersModule],

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum ApiKeyStatus {
@@ -13,9 +12,11 @@ enum ApiKeyStatus {
 }
 
 enum SmsStatus {
+  PENDING
   QUEUED
   SENT
   FAILED
+  DELIVERED
 }
 
 enum TransactionType {
@@ -24,18 +25,20 @@ enum TransactionType {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  email          String         @unique
-  passwordHash   String?
-  googleId       String?        @unique
-  name           String?
-  balance        Decimal        @default(0) @db.Decimal(12, 2)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  apiKeys        ApiKey[]
-  smsMessages    SmsMessage[]
-  transactions   Transaction[]
-  usageLogs      UsageLog[]
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String?
+  googleId     String?       @unique
+  name         String?
+  balance      Decimal       @default(0) @db.Decimal(14, 4)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  apiKeys      ApiKey[]
+  smsMessages  SmsMessage[]
+  transactions Transaction[]
+  usageLogs    UsageLog[]
+
+  @@index([createdAt])
 }
 
 model ApiKey {
@@ -44,50 +47,74 @@ model ApiKey {
   keyHash      String       @unique
   label        String
   status       ApiKeyStatus @default(ACTIVE)
+  rateLimitRpm Int          @default(60)
   lastUsedAt   DateTime?
   createdAt    DateTime     @default(now())
   revokedAt    DateTime?
   user         User         @relation(fields: [userId], references: [id])
+  smsMessages  SmsMessage[]
+  usageLogs    UsageLog[]
 
   @@index([userId, status])
+  @@index([status, lastUsedAt])
 }
 
 model SmsMessage {
-  id            String     @id @default(cuid())
-  userId        String
-  toPhoneNumber String
-  body          String
-  provider      String
-  providerRef   String?
-  status        SmsStatus  @default(QUEUED)
-  errorMessage  String?
-  createdAt     DateTime   @default(now())
-  sentAt        DateTime?
-  user          User       @relation(fields: [userId], references: [id])
+  id             String    @id @default(cuid())
+  userId         String
+  apiKeyId       String?
+  idempotencyKey String?
+  toPhoneNumber  String
+  body           String
+  provider       String
+  providerRef    String?
+  status         SmsStatus @default(PENDING)
+  errorMessage   String?
+  cost           Decimal   @default(1) @db.Decimal(14, 4)
+  createdAt      DateTime  @default(now())
+  queuedAt       DateTime?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  user           User      @relation(fields: [userId], references: [id])
+  apiKey         ApiKey?   @relation(fields: [apiKeyId], references: [id])
 
-  @@index([userId, status, createdAt])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([apiKeyId, createdAt(sort: Desc)])
+  @@index([toPhoneNumber, createdAt(sort: Desc)])
 }
 
 model Transaction {
   id          String          @id @default(cuid())
   userId      String
   type        TransactionType
-  amount      Decimal         @db.Decimal(12, 2)
+  amount      Decimal         @db.Decimal(14, 4)
   description String
+  metadata    Json?
   createdAt   DateTime        @default(now())
   user        User            @relation(fields: [userId], references: [id])
 
-  @@index([userId, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
 }
 
 model UsageLog {
-  id          String   @id @default(cuid())
-  userId      String
-  endpoint    String
-  method      String
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  id         String   @id @default(cuid())
+  userId     String?
+  apiKeyId   String?
+  endpoint   String
+  method     String
+  statusCode Int?
+  requestId  String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+  apiKey     ApiKey?  @relation(fields: [apiKeyId], references: [id])
 
-  @@index([userId, endpoint, createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([apiKeyId, endpoint, createdAt(sort: Desc)])
+  @@index([userId, endpoint, createdAt(sort: Desc)])
 }
