@@ -38,4 +38,24 @@ export class AppConfigService {
   get smsProvider() {
     return process.env.SMS_PROVIDER ?? 'mock';
   }
+
+  get clickMerchantId() {
+    return this.getRequired('CLICK_MERCHANT_ID');
+  }
+
+  get clickSecretKey() {
+    return this.getRequired('CLICK_SECRET_KEY');
+  }
+
+  get paymeMerchantId() {
+    return this.getRequired('PAYME_MERCHANT_ID');
+  }
+
+  get paymeSecretKey() {
+    return this.getRequired('PAYME_SECRET_KEY');
+  }
+
+  get paymentReturnUrl() {
+    return this.getRequired('PAYMENT_RETURN_URL');
+  }
 }

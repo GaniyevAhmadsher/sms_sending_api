@@ -42,6 +42,31 @@ export class BillingService {
     });
   }
 
+  async applyPaymentTopupInTransaction(
+    tx: TransactionClient,
+    userId: string,
+    paymentId: string,
+    provider: 'CLICK' | 'PAYME',
+    amount: number,
+  ) {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        balance: { increment: amount },
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId,
+        type: 'PAYMENT_TOPUP',
+        amount,
+        description: `${provider} top-up for payment ${paymentId}`,
+        metadata: { paymentId, provider, amount },
+      },
+    });
+  }
+
   async deductForSms(userId: string, smsId: string, cost = 1) {
     return this.prisma.$transaction(async (tx) => {
       await this.chargeSmsInTransaction(tx, userId, smsId, cost);
