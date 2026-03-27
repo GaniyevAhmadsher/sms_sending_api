@@ -17,6 +17,7 @@ import { RateLimitModule } from './infrastructure/rate-limit/rate-limit.module';
 import { GlobalThrottleGuard } from './infrastructure/rate-limit/global-throttle.guard';
 import { QueueConnectionModule } from './infrastructure/queue/queue-connection.module';
 import { HealthModule } from './modules/health/health.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './modules/health/health.module';
     SmsModule,
     AnalyticsModule,
     HealthModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
