@@ -60,8 +60,6 @@ export class SmsService {
       await this.queueService.enqueueSmsJob({
         smsId: sms.id,
         userId,
-        to: dto.to,
-        body: dto.body,
       });
 
       await this.prisma.smsMessage.update({

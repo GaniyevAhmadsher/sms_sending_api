@@ -58,6 +58,11 @@ export class AppConfigService {
     return this.getRequiredNumber('REDIS_COMMAND_TIMEOUT_MS');
   }
 
+  get redisPassword() {
+    const value = process.env.REDIS_PASSWORD;
+    return value && value.trim().length > 0 ? value : undefined;
+  }
+
   get jwtSecret() {
     return this.getRequired('JWT_SECRET');
   }
