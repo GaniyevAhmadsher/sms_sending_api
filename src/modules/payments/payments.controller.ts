@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-request.interface';
@@ -20,31 +12,20 @@ export class PaymentsController {
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
-  create(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreatePaymentDto,
-  ) {
-    return this.paymentsService.create(
-      user.id,
-      Number(dto.amount),
-      dto.provider,
-    );
+  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreatePaymentDto) {
+    return this.paymentsService.create(user.id, Number(dto.amount), dto.provider);
   }
 
   @Post('webhook/click')
-  webhookClick(
-    @Headers() headers: Record<string, string | string[] | undefined>,
-    @Body() body: any,
-  ) {
-    return this.paymentsService.handleClickWebhook(headers, body);
+  async webhookClick(@Headers() headers: Record<string, string | string[] | undefined>, @Body() body: any) {
+    await this.paymentsService.ingestWebhook('CLICK', headers, body);
+    return { ok: true };
   }
 
   @Post('webhook/payme')
-  webhookPayme(
-    @Headers() headers: Record<string, string | string[] | undefined>,
-    @Body() body: any,
-  ) {
-    return this.paymentsService.handlePaymeWebhook(headers, body);
+  async webhookPayme(@Headers() headers: Record<string, string | string[] | undefined>, @Body() body: any) {
+    await this.paymentsService.ingestWebhook('PAYME', headers, body);
+    return { ok: true };
   }
 
   @Get('history')

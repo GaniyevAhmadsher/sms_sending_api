@@ -24,7 +24,7 @@ export class AuthService {
       data: { email: dto.email, name: dto.name, passwordHash },
     });
 
-    return this.issueToken(user.id, user.email);
+    return this.issueToken(user.id);
   }
 
   async login(dto: LoginDto) {
@@ -34,7 +34,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueToken(user.id, user.email);
+    return this.issueToken(user.id);
   }
 
   async googleLogin(idToken: string) {
@@ -64,11 +64,11 @@ export class AuthService {
       create: { email: payload.email, googleId: payload.sub, name: payload.name ?? undefined },
     });
 
-    return this.issueToken(user.id, user.email);
+    return this.issueToken(user.id);
   }
 
-  private issueToken(userId: string, email: string) {
-    return { accessToken: this.tokenService.sign({ sub: userId, email }), tokenType: 'Bearer' };
+  private issueToken(userId: string) {
+    return { accessToken: this.tokenService.sign({ sub: userId }), tokenType: 'Bearer' };
   }
 
   private hashPassword(password: string) {

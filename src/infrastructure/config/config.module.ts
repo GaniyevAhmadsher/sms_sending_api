@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, OnModuleInit } from '@nestjs/common';
 import { AppConfigService } from './app-config.service';
 
 @Global()
@@ -6,4 +6,10 @@ import { AppConfigService } from './app-config.service';
   providers: [AppConfigService],
   exports: [AppConfigService],
 })
-export class ConfigModule {}
+export class ConfigModule implements OnModuleInit {
+  constructor(private readonly config: AppConfigService) {}
+
+  onModuleInit() {
+    this.config.validate();
+  }
+}

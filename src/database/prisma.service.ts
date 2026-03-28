@@ -34,6 +34,10 @@ export class PrismaService implements OnModuleDestroy {
     return this.client.usageLog;
   }
 
+  get webhookEvent() {
+    return this.client.webhookEvent;
+  }
+
   $transaction(callback: (tx: any) => Promise<unknown>) {
     return this.client.$transaction(callback);
   }

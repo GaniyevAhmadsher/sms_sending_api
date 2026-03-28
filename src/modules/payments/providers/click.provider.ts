@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { createHmac, randomUUID } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { AppConfigService } from '../../../infrastructure/config/app-config.service';
 import {
   CreatePaymentInput,
@@ -32,59 +32,49 @@ export class ClickProvider implements PaymentProvider {
     };
   }
 
-  verifyWebhook(
-    headers: Record<string, string | string[] | undefined>,
-    body: any,
-  ): VerifiedWebhook {
+  verifyWebhook(headers: Record<string, string | string[] | undefined>, body: any): VerifiedWebhook {
     const externalId = String(body?.transaction_id ?? body?.external_id ?? '');
     const amount = Number(body?.amount);
     const eventStatus = String(body?.status ?? '').toLowerCase();
     const signTime = String(body?.sign_time ?? body?.timestamp ?? '');
     const signature = this.extractSignature(headers, body);
 
-    if (
-      !externalId ||
-      !Number.isFinite(amount) ||
-      !eventStatus ||
-      !signTime ||
-      !signature
-    ) {
+    if (!externalId || !Number.isFinite(amount) || !eventStatus || !signTime || !signature) {
       throw new ForbiddenException('Invalid Click webhook payload');
     }
 
     const base = `${externalId}:${eventStatus}:${amount.toFixed(2)}:${signTime}`;
-    const expected = createHmac('sha256', this.config.clickSecretKey)
-      .update(base)
-      .digest('hex');
-
-    if (expected !== signature) {
-      throw new ForbiddenException('Invalid Click signature');
-    }
+    const expected = createHmac('sha256', this.config.clickSecretKey).update(base).digest('hex');
+    this.assertSignature(expected, signature);
 
     return {
       externalId,
       amount,
-      status:
-        eventStatus === 'success' || eventStatus === 'paid'
-          ? 'SUCCESS'
-          : 'FAILED',
+      status: this.mapStatus(eventStatus),
       raw: body as Record<string, unknown>,
+      dedupeKey: `click:${externalId}:${eventStatus}:${signTime}`,
     };
   }
 
-  private extractSignature(
-    headers: Record<string, string | string[] | undefined>,
-    body: any,
-  ): string {
+  private mapStatus(status: string): VerifiedWebhook['status'] {
+    if (status === 'success' || status === 'paid') return 'SUCCESS';
+    if (status === 'pending' || status === 'created') return 'PENDING';
+    if (status === 'canceled' || status === 'cancelled') return 'CANCELED';
+    return 'FAILED';
+  }
+
+  private assertSignature(expected: string, received: string) {
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(received);
+    if (expectedBuffer.length !== receivedBuffer.length || !timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      throw new ForbiddenException('Invalid Click signature');
+    }
+  }
+
+  private extractSignature(headers: Record<string, string | string[] | undefined>, body: any): string {
     const headerValue = headers['x-click-signature'];
-    if (typeof headerValue === 'string' && headerValue.length > 0) {
-      return headerValue;
-    }
-
-    if (Array.isArray(headerValue) && headerValue[0]) {
-      return headerValue[0];
-    }
-
+    if (typeof headerValue === 'string' && headerValue.length > 0) return headerValue;
+    if (Array.isArray(headerValue) && headerValue[0]) return headerValue[0];
     return String(body?.signature ?? '');
   }
 }
