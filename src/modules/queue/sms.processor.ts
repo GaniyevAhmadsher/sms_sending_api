@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { SMS_PROVIDER_TOKEN } from '../providers/providers.constants';
 import type { SmsProvider } from '../providers/providers.interface';
-import { SMS_QUEUE } from './queue.constants';
+import { SEND_SMS_JOB, SMS_DLQ, SMS_QUEUE } from './queue.constants';
 import type { SmsJobPayload } from './queue.service';
 
 @Injectable()
@@ -20,20 +20,16 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.timer = setInterval(() => {
       void this.pollOnce();
-    }, 250);
+    }, 100);
   }
 
   onModuleDestroy() {
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
+    if (this.timer) clearInterval(this.timer);
   }
 
   private async pollOnce() {
     const raw = await this.redisService.lpop(SMS_QUEUE);
-    if (!raw) {
-      return;
-    }
+    if (!raw) return;
 
     const payload = JSON.parse(raw) as SmsJobPayload;
     if (payload.retryAt && payload.retryAt > Date.now()) {
@@ -56,6 +52,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
           sentAt: new Date(),
         },
       });
+      this.logger.log(`${SEND_SMS_JOB} success ${payload.jobId ?? payload.smsId}`);
     } catch (error) {
       const attempt = payload.attempt ?? 1;
       if (attempt < 5) {
@@ -72,6 +69,10 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
           },
         });
+        await this.redisService.rpush(
+          SMS_DLQ,
+          JSON.stringify({ ...payload, finalError: error instanceof Error ? error.message : 'Unknown error' }),
+        );
       }
 
       this.logger.error(`Failed to process SMS ${payload.smsId} on attempt ${attempt}`);

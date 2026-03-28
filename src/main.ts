@@ -4,7 +4,11 @@ import { AppModule } from './app.module';
 import { AppConfigService } from './infrastructure/config/app-config.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+  app.useLogger(['error', 'warn', 'log']);
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,4 +21,4 @@ async function bootstrap() {
   await app.listen(config.port);
 }
 
-bootstrap();
+void bootstrap();

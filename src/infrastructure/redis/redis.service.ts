@@ -8,7 +8,7 @@ export class RedisService {
 
   async ping(): Promise<boolean> {
     try {
-      const response = await this.sendCommand(['PING']);
+      const response = await this.sendCommandWithRetry(['PING']);
       return response === 'PONG';
     } catch {
       return false;
@@ -16,28 +16,45 @@ export class RedisService {
   }
 
   async incrementWithExpiry(key: string, ttlSec: number): Promise<number> {
-    const current = await this.sendCommand(['INCR', key]);
+    const current = await this.sendCommandWithRetry(['INCR', key]);
     if (Number(current) === 1) {
-      await this.sendCommand(['EXPIRE', key, String(ttlSec)]);
+      await this.sendCommandWithRetry(['EXPIRE', key, String(ttlSec)]);
     }
     return Number(current);
   }
 
   async rpush(key: string, value: string): Promise<number> {
-    const result = await this.sendCommand(['RPUSH', key, value]);
+    const result = await this.sendCommandWithRetry(['RPUSH', key, value]);
     return Number(result);
   }
 
   async lpop(key: string): Promise<string | null> {
-    const result = await this.sendCommand(['LPOP', key], true);
+    const result = await this.sendCommandWithRetry(['LPOP', key], true);
     return result;
+  }
+
+  private async sendCommandWithRetry(args: string[], allowNullBulk = false): Promise<string | null> {
+    const maxAttempts = 3;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.sendCommand(args, allowNullBulk);
+      } catch (error) {
+        lastError = error;
+        if (attempt === maxAttempts) break;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 50));
+      }
+    }
+
+    throw lastError;
   }
 
   private sendCommand(args: string[], allowNullBulk = false): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const socket = new Socket();
       let result = '';
-      socket.setTimeout(1500);
+      socket.setTimeout(this.config.redisCommandTimeoutMs);
 
       socket.connect(this.config.redisPort, this.config.redisHost, () => {
         socket.write(this.toResp(args));
@@ -58,32 +75,11 @@ export class RedisService {
       });
 
       socket.on('close', () => {
-        if (!result) {
-          reject(new Error('No Redis response'));
-          return;
-        }
-
-        if (result.startsWith('+')) {
-          resolve(result.replace(/^\+/, '').trim());
-          return;
-        }
-
-        if (result.startsWith(':')) {
-          resolve(result.replace(/^:/, '').trim());
-          return;
-        }
-
-        if (result.startsWith('$-1') && allowNullBulk) {
-          resolve(null);
-          return;
-        }
-
-        if (result.startsWith('$')) {
-          const parts = result.split('\r\n');
-          resolve(parts[1] ?? '');
-          return;
-        }
-
+        if (!result) return reject(new Error('No Redis response'));
+        if (result.startsWith('+')) return resolve(result.replace(/^\+/, '').trim());
+        if (result.startsWith(':')) return resolve(result.replace(/^:/, '').trim());
+        if (result.startsWith('$-1') && allowNullBulk) return resolve(null);
+        if (result.startsWith('$')) return resolve(result.split('\r\n')[1] ?? '');
         reject(new Error(result.trim()));
       });
     });

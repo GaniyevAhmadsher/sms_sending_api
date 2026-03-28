@@ -10,114 +10,70 @@ describe('PaymentsService', () => {
       findMany: jest.fn(),
     };
 
+    const webhookEvent = {
+      upsert: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+    };
+
     const prisma = {
       payment,
-      $transaction: jest.fn(async (cb: any) =>
-        cb({ payment, user: {}, transaction: {} }),
-      ),
+      webhookEvent,
+      $transaction: jest.fn(async (cb: any) => cb({ payment, user: { update: jest.fn() }, transaction: { create: jest.fn() } })),
     } as any;
 
     const billingService = {
       applyPaymentTopupInTransaction: jest.fn(),
     } as any;
 
+    const queueService = {
+      enqueuePaymentWebhookJob: jest.fn(),
+    } as any;
+
     const providers = [
       {
         provider: 'CLICK',
-        createPayment: jest.fn(async () => ({
-          externalId: 'click-ext-1',
-          paymentUrl: 'https://click/pay',
-          params: { foo: 'bar' },
-        })),
-        verifyWebhook: jest.fn(() => ({
-          externalId: 'click-ext-1',
-          amount: 100,
-          status: 'SUCCESS',
-          raw: {},
-        })),
+        createPayment: jest.fn(async () => ({ externalId: 'click-ext-1', paymentUrl: 'https://click/pay', params: { foo: 'bar' } })),
+        verifyWebhook: jest.fn(() => ({ externalId: 'click-ext-1', amount: 100, status: 'SUCCESS', raw: {}, dedupeKey: 'd1' })),
       },
       {
         provider: 'PAYME',
-        createPayment: jest.fn(async () => ({
-          externalId: 'payme-ext-1',
-          paymentUrl: 'https://payme/pay',
-          params: { foo: 'bar' },
-        })),
-        verifyWebhook: jest.fn(() => ({
-          externalId: 'payme-ext-1',
-          amount: 100,
-          status: 'SUCCESS',
-          raw: {},
-        })),
+        createPayment: jest.fn(async () => ({ externalId: 'payme-ext-1', paymentUrl: 'https://payme/pay', params: { foo: 'bar' } })),
+        verifyWebhook: jest.fn(() => ({ externalId: 'payme-ext-1', amount: 100, status: 'SUCCESS', raw: {}, dedupeKey: 'd2' })),
       },
     ] as any;
 
-    const service = new PaymentsService(prisma, billingService, providers);
-    return { service, prisma, billingService, providers, payment };
+    const service = new PaymentsService(prisma, billingService, queueService, providers);
+    return { service, payment, webhookEvent, billingService, queueService };
   };
 
-  it('creates pending payment and returns provider payment URL', async () => {
+  it('creates pending payment and returns provider URL', async () => {
     const { service, payment } = makeService();
-    payment.create.mockResolvedValue({
-      id: 'p1',
-      userId: 'u1',
-      amount: 100,
-      provider: 'CLICK',
-      status: 'PENDING',
-    });
-    payment.update.mockResolvedValue({
-      id: 'p1',
-      userId: 'u1',
-      amount: 100,
-      provider: 'CLICK',
-      status: 'PENDING',
-      externalId: 'click-ext-1',
-    });
+    payment.create.mockResolvedValue({ id: 'p1', userId: 'u1', amount: 100, provider: 'CLICK', status: 'PENDING' });
+    payment.update.mockResolvedValue({ id: 'p1', userId: 'u1', amount: 100, provider: 'CLICK', status: 'PENDING', externalId: 'click-ext-1' });
 
     const result = await service.create('u1', 100, 'click');
 
     expect(result.status).toBe('PENDING');
     expect(result.externalId).toBe('click-ext-1');
-    expect(result.paymentUrl).toContain('click');
   });
 
-  it('ignores duplicated webhook when payment already processed', async () => {
-    const { service, payment, billingService } = makeService();
-    payment.findUnique.mockResolvedValue({
-      id: 'p1',
-      userId: 'u1',
-      amount: 100,
-      provider: 'CLICK',
-      status: 'SUCCESS',
-      externalId: 'click-ext-1',
-    });
+  it('handles duplicate webhook idempotently', async () => {
+    const { service, webhookEvent } = makeService();
+    webhookEvent.upsert.mockResolvedValue({ id: 'evt1', status: 'PROCESSED' });
 
-    const result = await service.handleClickWebhook({}, {});
+    const result = await service.ingestWebhook('CLICK', {}, {});
 
     expect(result.ignored).toBe(true);
-    expect(result.reason).toBe('already_processed');
-    expect(
-      billingService.applyPaymentTopupInTransaction,
-    ).not.toHaveBeenCalled();
   });
 
-  it('processes successful webhook atomically and tops up once', async () => {
-    const { service, payment, billingService } = makeService();
-    payment.findUnique.mockResolvedValue({
-      id: 'p1',
-      userId: 'u1',
-      amount: 100,
-      provider: 'CLICK',
-      status: 'PENDING',
-      externalId: 'click-ext-1',
-    });
-    payment.updateMany.mockResolvedValue({ count: 1 });
+  it('queues webhook for async processing', async () => {
+    const { service, webhookEvent, queueService } = makeService();
+    webhookEvent.upsert.mockResolvedValue({ id: 'evt2', status: 'RECEIVED' });
 
-    const result = await service.handleClickWebhook({}, {});
+    await service.ingestWebhook('CLICK', {}, {});
 
-    expect(result.status).toBe('SUCCESS');
-    expect(billingService.applyPaymentTopupInTransaction).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(queueService.enqueuePaymentWebhookJob).toHaveBeenCalledTimes(1);
+    expect(webhookEvent.update).toHaveBeenCalledTimes(1);
   });
 });

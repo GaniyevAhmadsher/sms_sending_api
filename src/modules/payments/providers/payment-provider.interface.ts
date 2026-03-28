@@ -14,9 +14,10 @@ export interface CreatePaymentOutput {
 
 export interface VerifiedWebhook {
   externalId: string;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELED';
   amount: number;
   raw: Record<string, unknown>;
+  dedupeKey: string;
 }
 
 export interface PaymentProvider {

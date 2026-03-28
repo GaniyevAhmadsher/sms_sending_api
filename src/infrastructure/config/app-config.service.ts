@@ -4,15 +4,42 @@ import { Injectable } from '@nestjs/common';
 export class AppConfigService {
   private getRequired(name: string): string {
     const value = process.env[name];
-    if (!value) {
+    if (!value || value.trim().length === 0) {
       throw new Error(`Missing required environment variable: ${name}`);
     }
 
     return value;
   }
 
+  private getRequiredNumber(name: string): number {
+    const raw = this.getRequired(name);
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      throw new Error(`Invalid numeric environment variable: ${name}`);
+    }
+
+    return value;
+  }
+
+  validate() {
+    this.databaseUrl;
+    this.redisHost;
+    this.redisPort;
+    this.redisCommandTimeoutMs;
+    this.jwtSecret;
+    this.jwtIssuer;
+    this.jwtAudience;
+    this.jwtAccessTtlSeconds;
+    this.apiKeyHashSecret;
+    this.clickMerchantId;
+    this.clickSecretKey;
+    this.paymeMerchantId;
+    this.paymeSecretKey;
+    this.paymentReturnUrl;
+  }
+
   get port() {
-    return Number(process.env.PORT ?? 3000);
+    return this.getRequiredNumber('PORT');
   }
 
   get databaseUrl() {
@@ -20,15 +47,31 @@ export class AppConfigService {
   }
 
   get redisHost() {
-    return process.env.REDIS_HOST ?? '127.0.0.1';
+    return this.getRequired('REDIS_HOST');
   }
 
   get redisPort() {
-    return Number(process.env.REDIS_PORT ?? 6379);
+    return this.getRequiredNumber('REDIS_PORT');
+  }
+
+  get redisCommandTimeoutMs() {
+    return this.getRequiredNumber('REDIS_COMMAND_TIMEOUT_MS');
   }
 
   get jwtSecret() {
     return this.getRequired('JWT_SECRET');
+  }
+
+  get jwtIssuer() {
+    return this.getRequired('JWT_ISSUER');
+  }
+
+  get jwtAudience() {
+    return this.getRequired('JWT_AUDIENCE');
+  }
+
+  get jwtAccessTtlSeconds() {
+    return this.getRequiredNumber('JWT_ACCESS_TTL_SECONDS');
   }
 
   get apiKeyHashSecret() {
@@ -36,7 +79,7 @@ export class AppConfigService {
   }
 
   get smsProvider() {
-    return process.env.SMS_PROVIDER ?? 'mock';
+    return this.getRequired('SMS_PROVIDER');
   }
 
   get clickMerchantId() {
