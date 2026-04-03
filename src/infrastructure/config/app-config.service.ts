@@ -21,6 +21,18 @@ export class AppConfigService {
     return value;
   }
 
+  private getOptionalNumber(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw || raw.trim().length === 0) return fallback;
+
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      throw new Error(`Invalid numeric environment variable: ${name}`);
+    }
+
+    return value;
+  }
+
   validate() {
     this.databaseUrl;
     this.redisHost;
@@ -30,12 +42,17 @@ export class AppConfigService {
     this.jwtIssuer;
     this.jwtAudience;
     this.jwtAccessTtlSeconds;
+    this.jwtRefreshTtlSeconds;
+    this.jwtKeyId;
     this.apiKeyHashSecret;
     this.clickMerchantId;
     this.clickSecretKey;
     this.paymeMerchantId;
     this.paymeSecretKey;
     this.paymentReturnUrl;
+    this.webhookMaxDriftSec;
+    this.webhookNonceTtlSec;
+    this.dailyTenantSpendLimit;
   }
 
   get port() {
@@ -55,7 +72,7 @@ export class AppConfigService {
   }
 
   get redisCommandTimeoutMs() {
-    return this.getRequiredNumber('REDIS_COMMAND_TIMEOUT_MS');
+    return this.getOptionalNumber('REDIS_COMMAND_TIMEOUT_MS', 5000);
   }
 
   get redisPassword() {
@@ -77,6 +94,14 @@ export class AppConfigService {
 
   get jwtAccessTtlSeconds() {
     return this.getRequiredNumber('JWT_ACCESS_TTL_SECONDS');
+  }
+
+  get jwtRefreshTtlSeconds() {
+    return this.getOptionalNumber('JWT_REFRESH_TTL_SECONDS', 60 * 60 * 24 * 30);
+  }
+
+  get jwtKeyId() {
+    return process.env.JWT_KEY_ID?.trim() || 'primary';
   }
 
   get apiKeyHashSecret() {
@@ -105,5 +130,17 @@ export class AppConfigService {
 
   get paymentReturnUrl() {
     return this.getRequired('PAYMENT_RETURN_URL');
+  }
+
+  get webhookMaxDriftSec() {
+    return this.getOptionalNumber('WEBHOOK_MAX_DRIFT_SEC', 300);
+  }
+
+  get webhookNonceTtlSec() {
+    return this.getOptionalNumber('WEBHOOK_NONCE_TTL_SEC', 600);
+  }
+
+  get dailyTenantSpendLimit() {
+    return this.getOptionalNumber('DAILY_TENANT_SPEND_LIMIT', 5000);
   }
 }

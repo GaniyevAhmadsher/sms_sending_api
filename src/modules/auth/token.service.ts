@@ -8,41 +8,73 @@ interface TokenPayload {
   aud: string;
   iat: number;
   exp: number;
+  type: 'access' | 'refresh';
 }
 
 @Injectable()
 export class TokenService {
   constructor(private readonly config: AppConfigService) {}
 
-  sign(payload: { sub: string }) {
+  signAccess(payload: { sub: string }) {
+    return this.sign(payload.sub, 'access', this.config.jwtAccessTtlSeconds);
+  }
+
+  signRefresh(payload: { sub: string }) {
+    return this.sign(payload.sub, 'refresh', this.config.jwtRefreshTtlSeconds);
+  }
+
+  verifyAccess(token: string): TokenPayload {
+    const payload = this.verify(token);
+    if (payload.type !== 'access') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+    return payload;
+  }
+
+  verifyRefresh(token: string): TokenPayload {
+    const payload = this.verify(token);
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+    return payload;
+  }
+
+  private sign(sub: string, type: TokenPayload['type'], ttlSeconds: number): string {
     const iat = Math.floor(Date.now() / 1000);
-    const exp = iat + this.config.jwtAccessTtlSeconds;
+    const exp = iat + ttlSeconds;
     const fullPayload: TokenPayload = {
-      sub: payload.sub,
+      sub,
       iat,
       exp,
       iss: this.config.jwtIssuer,
       aud: this.config.jwtAudience,
+      type,
     };
 
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT', kid: this.config.jwtKeyId })).toString(
+      'base64url',
+    );
     const body = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
     const data = `${header}.${body}`;
     const signature = crypto.createHmac('sha256', this.config.jwtSecret).update(data).digest('base64url');
     return `${data}.${signature}`;
   }
 
-  verify(token: string): TokenPayload {
+  private verify(token: string): TokenPayload {
     const [header, body, signature] = token.split('.');
     if (!header || !body || !signature) {
       throw new UnauthorizedException('Invalid token');
     }
 
     const data = `${header}.${body}`;
-    const expected = crypto.createHmac('sha256', this.config.jwtSecret).update(data).digest('base64url');
-    const signatureBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expected);
-    if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    const valid = this.getCandidateSecrets().some((secret) => {
+      const expected = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+      const signatureBuffer = Buffer.from(signature);
+      const expectedBuffer = Buffer.from(expected);
+      return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+    });
+
+    if (!valid) {
       throw new UnauthorizedException('Invalid token signature');
     }
 
@@ -57,5 +89,12 @@ export class TokenService {
     }
 
     return payload;
+  }
+
+  private getCandidateSecrets(): string[] {
+    const previous = process.env.JWT_PREVIOUS_SECRETS?.split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return [this.config.jwtSecret, ...(previous ?? [])];
   }
 }

@@ -1,0 +1,13 @@
+{
+  "info": {
+    "name": "SMS SaaS API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {"name": "Auth Login", "request": {"method": "POST", "url": "{{baseUrl}}/auth/login", "body": {"mode": "raw", "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"}}},
+    {"name": "Create Payment", "request": {"method": "POST", "url": "{{baseUrl}}/payments/create"}},
+    {"name": "Send SMS", "request": {"method": "POST", "url": "{{baseUrl}}/sms/send"}},
+    {"name": "Metrics", "request": {"method": "GET", "url": "{{baseUrl}}/metrics"}}
+  ],
+  "variable": [{"key": "baseUrl", "value": "http://localhost:3000"}]
+}

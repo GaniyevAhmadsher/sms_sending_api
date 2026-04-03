@@ -13,18 +13,27 @@ export class RequestLoggingMiddleware implements NestMiddleware {
         req.headers['x-correlation-id']) ||
       randomUUID();
 
+    const userId = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'] : undefined;
+    const tenantId = typeof req.headers['x-tenant-id'] === 'string' ? req.headers['x-tenant-id'] : undefined;
+    const apiKeyId = typeof req.headers['x-api-key-id'] === 'string' ? req.headers['x-api-key-id'] : undefined;
+
     res.setHeader('x-correlation-id', correlationId);
     const start = Date.now();
 
-    requestContext.run({ correlationId }, () => {
+    requestContext.run({ correlationId, userId, tenantId, apiKeyId }, () => {
       res.on('finish', () => {
         this.logger.log(
           JSON.stringify({
             correlationId,
+            userId,
+            apiKeyId,
+            tenantId,
             method: req.method,
             path: req.originalUrl,
             statusCode: res.statusCode,
             durationMs: Date.now() - start,
+            userAgent: req.headers['user-agent'],
+            remoteIp: req.ip,
           }),
         );
       });

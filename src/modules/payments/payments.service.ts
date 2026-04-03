@@ -4,6 +4,9 @@ import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
+import { MetricsService } from '../../infrastructure/observability/metrics.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
+import { AppConfigService } from '../../infrastructure/config/app-config.service';
 
 @Injectable()
 export class PaymentsService {
@@ -14,6 +17,9 @@ export class PaymentsService {
     private readonly billingService: BillingService,
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
+    private readonly metrics: MetricsService,
+    private readonly redis: RedisService,
+    private readonly config: AppConfigService,
   ) {
     this.providers = providers;
   }
@@ -53,6 +59,28 @@ export class PaymentsService {
 
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
     const provider = this.getProvider(providerName);
+    const webhookReceivedAt = Date.now();
+
+    const timestampHeader = this.getHeaderValue(headers, 'x-webhook-timestamp');
+    const nonceHeader = this.getHeaderValue(headers, 'x-webhook-nonce');
+    const timestamp = Number(timestampHeader ?? body?.timestamp ?? 0);
+    if (!Number.isFinite(timestamp)) {
+      return { accepted: true, ignored: true, reason: 'invalid_timestamp' };
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSec - timestamp) > this.config.webhookMaxDriftSec) {
+      return { accepted: true, ignored: true, reason: 'stale_webhook' };
+    }
+
+    if (nonceHeader) {
+      const nonceKey = `webhook:nonce:${providerName}:${nonceHeader}`;
+      const isFresh = await this.redis.setNxWithExpiry(nonceKey, '1', this.config.webhookNonceTtlSec);
+      if (!isFresh) {
+        return { accepted: true, ignored: true, reason: 'replay_detected' };
+      }
+    }
+
     const payload = provider.verifyWebhook(headers, body);
 
     const event = await this.prisma.webhookEvent.upsert({
@@ -73,6 +101,7 @@ export class PaymentsService {
 
     await this.queueService.enqueuePaymentWebhookJob({ eventId: event.id, provider: providerName, jobId: `payment:${event.id}` });
     await this.prisma.webhookEvent.update({ where: { id: event.id }, data: { status: 'QUEUED' } });
+    this.metrics.observe('webhook_latency', Date.now() - webhookReceivedAt, { provider: providerName });
 
     return { accepted: true };
   }
@@ -114,6 +143,7 @@ export class PaymentsService {
 
       if (payload.status === 'FAILED' || payload.status === 'CANCELED') {
         await tx.payment.update({ where: { id: payment.id }, data: { status: payload.status } });
+        this.metrics.increment('payment_failed_total', 1, { provider, status: payload.status });
         return { accepted: true, ignored: false, status: payload.status };
       }
 
@@ -127,6 +157,7 @@ export class PaymentsService {
       if (updated.count !== 1) return { accepted: true, ignored: true, reason: 'concurrency_guard' };
 
       await this.billingService.applyPaymentTopupInTransaction(tx, payment.userId, payment.id, provider, amount);
+      this.metrics.increment('payment_topup_total', 1, { provider });
       return { accepted: true, ignored: false, status: 'SUCCESS' };
     });
 
@@ -143,5 +174,11 @@ export class PaymentsService {
     const provider = providerRaw?.toUpperCase();
     if (provider === 'CLICK' || provider === 'PAYME') return provider;
     throw new BadRequestException('Provider must be click or payme');
+  }
+
+  private getHeaderValue(headers: Record<string, string | string[] | undefined>, key: string): string | undefined {
+    const value = headers[key] ?? headers[key.toLowerCase()] ?? headers[key.toUpperCase()];
+    if (Array.isArray(value)) return value[0];
+    return typeof value === 'string' ? value : undefined;
   }
 }

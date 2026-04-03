@@ -33,6 +33,16 @@ export class RedisService {
     return result;
   }
 
+  async llen(key: string): Promise<number> {
+    const result = await this.sendCommandWithRetry(['LLEN', key]);
+    return Number(result);
+  }
+
+  async setNxWithExpiry(key: string, value: string, ttlSec: number): Promise<boolean> {
+    const result = await this.sendCommandWithRetry(['SET', key, value, 'EX', String(ttlSec), 'NX']);
+    return result === 'OK';
+  }
+
   private async sendCommandWithRetry(args: string[], allowNullBulk = false): Promise<string | null> {
     const maxAttempts = 3;
     let lastError: unknown;

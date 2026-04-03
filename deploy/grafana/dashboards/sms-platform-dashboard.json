@@ -1,0 +1,48 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "SMS Sent vs Failed",
+      "targets": [
+        {"expr": "sms_success_total", "legendFormat": "success"},
+        {"expr": "sms_failed_total", "legendFormat": "failed"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "API Latency p95",
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(api_request_duration_bucket[5m])) by (le))"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Queue Depth",
+      "targets": [{"expr": "queue_depth"}],
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8}
+    },
+    {
+      "type": "stat",
+      "title": "DLQ Size",
+      "targets": [{"expr": "dlq_size"}],
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8}
+    },
+    {
+      "type": "stat",
+      "title": "Payment Topups",
+      "targets": [{"expr": "payment_topup_total"}],
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["sms", "saas", "production"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "",
+  "title": "SMS Platform Overview",
+  "version": 1
+}

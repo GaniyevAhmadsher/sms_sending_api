@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { SendSmsDto } from './dto/send-sms.dto';
+import { MetricsService } from '../../infrastructure/observability/metrics.service';
 
 @Injectable()
 export class SmsService {
@@ -12,10 +13,12 @@ export class SmsService {
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
     private readonly billingService: BillingService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async send(userId: string, dto: SendSmsDto, apiKeyId?: string) {
     this.validatePayload(dto);
+    this.metrics.increment('sms_send_total');
     const existing = dto.idempotencyKey
       ? await this.prisma.smsMessage.findUnique({
           where: {
@@ -68,6 +71,7 @@ export class SmsService {
       });
     } catch (error) {
       this.logger.error(`Failed queue enqueue for SMS ${sms.id}`);
+      this.metrics.increment('sms_failed_total', 1, { reason: 'queue_enqueue_failed' });
       await this.prisma.smsMessage.update({
         where: { id: sms.id },
         data: {

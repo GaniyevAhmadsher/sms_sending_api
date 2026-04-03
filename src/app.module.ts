@@ -19,6 +19,8 @@ import { QueueConnectionModule } from './infrastructure/queue/queue-connection.m
 import { HealthModule } from './modules/health/health.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RequestLoggingMiddleware } from './infrastructure/logging/request-logging.middleware';
+import { ObservabilityModule } from './infrastructure/observability/observability.module';
+import { MetricsMiddleware } from './infrastructure/observability/metrics.middleware';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { RequestLoggingMiddleware } from './infrastructure/logging/request-loggi
     RedisModule,
     RateLimitModule,
     QueueConnectionModule,
+    ObservabilityModule,
     AuthModule,
     UsersModule,
     ApiKeysModule,
@@ -45,10 +48,11 @@ import { RequestLoggingMiddleware } from './infrastructure/logging/request-loggi
       provide: APP_GUARD,
       useClass: GlobalThrottleGuard,
     },
+    MetricsMiddleware,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggingMiddleware).forRoutes('*');
+    consumer.apply(RequestLoggingMiddleware, MetricsMiddleware).forRoutes('*');
   }
 }

@@ -4,6 +4,7 @@ import { SMS_PROVIDER_TOKEN } from '../providers/providers.constants';
 import type { SmsProvider } from '../providers/providers.interface';
 import { BULLMQ_CONNECTION, SMS_DLQ, SMS_QUEUE } from './queue.constants';
 import type { SmsJobPayload } from './sms.queue';
+import { MetricsService } from '../../infrastructure/observability/metrics.service';
 
 interface SmsJob {
   id?: string;
@@ -33,6 +34,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     @Inject(BULLMQ_CONNECTION) private readonly connection: any,
     @Inject(SMS_PROVIDER_TOKEN) private readonly smsProvider: SmsProvider,
+    private readonly metrics: MetricsService,
   ) {}
 
   async onModuleInit() {
@@ -102,9 +104,14 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    const providerStart = Date.now();
     const result = await this.smsProvider.send({
       to: sms.toPhoneNumber,
       body: sms.body,
+    });
+
+    this.metrics.observe('provider_latency', Date.now() - providerStart, {
+      provider: result.provider,
     });
 
     await this.prisma.smsMessage.update({
@@ -118,6 +125,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    this.metrics.increment('sms_success_total', 1, { provider: result.provider });
     return { sent: true };
   }
 
@@ -127,6 +135,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     const attempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1;
     const attemptsMade = job.attemptsMade;
     this.logger.error(`job failed id=${job.id} attempt=${attemptsMade}/${attempts} error=${error.message}`);
+    this.metrics.increment('queue_retry_total');
 
     if (attemptsMade >= attempts) {
       await this.prisma.smsMessage.update({
@@ -137,6 +146,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
         },
       });
 
+      this.metrics.increment('sms_failed_total', 1, { reason: 'max_attempts' });
       await this.connection.rpush(
         SMS_DLQ,
         JSON.stringify({

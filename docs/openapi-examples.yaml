@@ -1,0 +1,26 @@
+openapi: 3.0.3
+info:
+  title: SMS SaaS API examples
+  version: 1.0.0
+paths:
+  /auth/refresh:
+    post:
+      summary: Rotate access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New access + refresh tokens
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: text/plain metrics

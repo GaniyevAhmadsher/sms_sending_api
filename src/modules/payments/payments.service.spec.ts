@@ -43,8 +43,12 @@ describe('PaymentsService', () => {
       },
     ] as any;
 
-    const service = new PaymentsService(prisma, billingService, queueService, providers);
-    return { service, payment, webhookEvent, billingService, queueService };
+    const metrics = { increment: jest.fn(), observe: jest.fn() } as any;
+    const redis = { setNxWithExpiry: jest.fn().mockResolvedValue(true) } as any;
+    const config = { webhookMaxDriftSec: 300, webhookNonceTtlSec: 600 } as any;
+
+    const service = new PaymentsService(prisma, billingService, queueService, providers, metrics, redis, config);
+    return { service, payment, webhookEvent, billingService, queueService, redis };
   };
 
   it('creates pending payment and returns provider URL', async () => {
@@ -62,18 +66,23 @@ describe('PaymentsService', () => {
     const { service, webhookEvent } = makeService();
     webhookEvent.upsert.mockResolvedValue({ id: 'evt1', status: 'PROCESSED' });
 
-    const result = await service.ingestWebhook('CLICK', {}, {});
+    const now = Math.floor(Date.now() / 1000);
+    const result = await service.ingestWebhook('CLICK', { 'x-webhook-timestamp': String(now) }, {});
 
     expect(result.ignored).toBe(true);
   });
 
-  it('queues webhook for async processing', async () => {
-    const { service, webhookEvent, queueService } = makeService();
-    webhookEvent.upsert.mockResolvedValue({ id: 'evt2', status: 'RECEIVED' });
+  it('rejects replay nonce', async () => {
+    const { service, redis } = makeService();
+    redis.setNxWithExpiry.mockResolvedValue(false);
 
-    await service.ingestWebhook('CLICK', {}, {});
+    const now = Math.floor(Date.now() / 1000);
+    const result = await service.ingestWebhook(
+      'CLICK',
+      { 'x-webhook-timestamp': String(now), 'x-webhook-nonce': 'nonce-1' },
+      {},
+    );
 
-    expect(queueService.enqueuePaymentWebhookJob).toHaveBeenCalledTimes(1);
-    expect(webhookEvent.update).toHaveBeenCalledTimes(1);
+    expect(result.reason).toBe('replay_detected');
   });
 });

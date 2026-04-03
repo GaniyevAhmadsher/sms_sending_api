@@ -1,0 +1,28 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - name: Docker build (placeholder)
+        run: |
+          docker build -f Dockerfile.api -t sms-api:${GITHUB_SHA} .
+          docker build -f Dockerfile.worker -t sms-worker:${GITHUB_SHA} .
+      - name: Deploy notice
+        run: echo "Add infra-specific deployment command (helm/ssh/ecs) here"
