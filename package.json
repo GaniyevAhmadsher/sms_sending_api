@@ -19,7 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "start:worker": "node dist/worker",
-    "start:worker:dev": "ts-node src/worker.ts"
+    "start:worker:dev": "ts-node src/worker.ts",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:status": "prisma migrate status",
+    "build:api": "nest build",
+    "build:worker": "nest build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

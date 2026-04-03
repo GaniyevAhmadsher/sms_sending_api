@@ -31,6 +31,7 @@ export class SmsService {
       : null;
 
     if (existing) {
+      this.metrics.smsSendTotal.labels().inc();
       return {
         id: existing.id,
         status: existing.status,
@@ -58,6 +59,8 @@ export class SmsService {
 
       return created;
     });
+
+    this.metrics.smsSendTotal.labels().inc();
 
     try {
       await this.queueService.enqueueSmsJob({

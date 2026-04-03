@@ -54,6 +54,7 @@ export class PaymentsService {
   }
 
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
+    const startedAt = process.hrtime.bigint();
     const provider = this.getProvider(providerName);
     const payload = provider.verifyWebhook(headers, body);
 
@@ -75,6 +76,9 @@ export class PaymentsService {
 
     await this.queueService.enqueuePaymentWebhookJob({ eventId: event.id, provider: providerName, jobId: `payment:${event.id}` });
     await this.prisma.webhookEvent.update({ where: { id: event.id }, data: { status: 'QUEUED' } });
+
+    const latencySeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
+    this.metrics.webhookLatency.labels({ provider: providerName }).observe(latencySeconds);
 
     return { accepted: true };
   }

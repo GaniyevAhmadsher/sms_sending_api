@@ -40,6 +40,8 @@ import { PinoLoggerService } from './infrastructure/logging/pino-logger.service'
     AnalyticsModule,
     HealthModule,
     PaymentsModule,
+    ObservabilityModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [
