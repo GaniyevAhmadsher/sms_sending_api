@@ -19,10 +19,14 @@ import { QueueConnectionModule } from './infrastructure/queue/queue-connection.m
 import { HealthModule } from './modules/health/health.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RequestLoggingMiddleware } from './infrastructure/logging/request-logging.middleware';
+import { LoggingModule } from './infrastructure/logging/logging.module';
+import { MetricsModule } from './infrastructure/metrics/metrics.module';
 
 @Module({
   imports: [
     ConfigModule,
+    LoggingModule,
+    MetricsModule,
     PrismaModule,
     RedisModule,
     RateLimitModule,

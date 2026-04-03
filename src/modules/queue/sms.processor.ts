@@ -4,6 +4,8 @@ import { SMS_PROVIDER_TOKEN } from '../providers/providers.constants';
 import type { SmsProvider } from '../providers/providers.interface';
 import { BULLMQ_CONNECTION, SMS_DLQ, SMS_QUEUE } from './queue.constants';
 import type { SmsJobPayload } from './sms.queue';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
 
 interface SmsJob {
   id?: string;
@@ -33,6 +35,8 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     @Inject(BULLMQ_CONNECTION) private readonly connection: any,
     @Inject(SMS_PROVIDER_TOKEN) private readonly smsProvider: SmsProvider,
+    private readonly metrics: MetricsService,
+    private readonly redis: RedisService,
   ) {}
 
   async onModuleInit() {
@@ -102,11 +106,13 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    const stop = this.metrics.providerLatency.startTimer({ provider: 'default' });
     const result = await this.smsProvider.send({
       to: sms.toPhoneNumber,
       body: sms.body,
     });
 
+    stop();
     await this.prisma.smsMessage.update({
       where: { id: payload.smsId },
       data: {
@@ -118,6 +124,11 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    this.metrics.smsSuccessTotal.inc();
+    const queueSize = await this.redis.llen(SMS_QUEUE);
+    const dlqSize = await this.redis.llen(SMS_DLQ);
+    this.metrics.queueDepth.labels(SMS_QUEUE).set(queueSize);
+    this.metrics.dlqSize.labels(SMS_DLQ).set(dlqSize);
     return { sent: true };
   }
 
@@ -127,8 +138,11 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     const attempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1;
     const attemptsMade = job.attemptsMade;
     this.logger.error(`job failed id=${job.id} attempt=${attemptsMade}/${attempts} error=${error.message}`);
+    this.metrics.queueRetryTotal.labels(SMS_QUEUE).inc();
+    this.metrics.providerFailureRate.inc({ provider: 'default' });
 
     if (attemptsMade >= attempts) {
+      this.metrics.smsFailedTotal.inc();
       await this.prisma.smsMessage.update({
         where: { id: job.data.smsId },
         data: {

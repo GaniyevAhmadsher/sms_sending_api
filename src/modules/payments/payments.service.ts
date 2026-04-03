@@ -1,5 +1,8 @@
 import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
+import { AppConfigService } from '../../infrastructure/config/app-config.service';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
@@ -13,6 +16,9 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly billingService: BillingService,
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
+    private readonly redis: RedisService,
+    private readonly config: AppConfigService,
+    private readonly metrics: MetricsService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
   ) {
     this.providers = providers;
@@ -52,8 +58,11 @@ export class PaymentsService {
   }
 
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
+    const stop = this.metrics.webhookLatency.startTimer({ provider: providerName });
     const provider = this.getProvider(providerName);
     const payload = provider.verifyWebhook(headers, body);
+    this.assertWebhookTimestamp(payload.raw);
+    await this.assertWebhookNonce(providerName, payload.dedupeKey);
 
     const event = await this.prisma.webhookEvent.upsert({
       where: { dedupeKey: payload.dedupeKey },
@@ -74,6 +83,7 @@ export class PaymentsService {
     await this.queueService.enqueuePaymentWebhookJob({ eventId: event.id, provider: providerName, jobId: `payment:${event.id}` });
     await this.prisma.webhookEvent.update({ where: { id: event.id }, data: { status: 'QUEUED' } });
 
+    stop();
     return { accepted: true };
   }
 
@@ -114,12 +124,14 @@ export class PaymentsService {
 
       if (payload.status === 'FAILED' || payload.status === 'CANCELED') {
         await tx.payment.update({ where: { id: payment.id }, data: { status: payload.status } });
+        this.metrics.paymentFailedTotal.inc();
         return { accepted: true, ignored: false, status: payload.status };
       }
 
       const amount = Number(payment.amount);
       if (Math.abs(payload.amount - amount) > 0.0001) {
         await tx.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
+        this.metrics.paymentFailedTotal.inc();
         return { accepted: true, ignored: false, status: 'FAILED', reason: 'amount_mismatch' };
       }
 
@@ -127,10 +139,38 @@ export class PaymentsService {
       if (updated.count !== 1) return { accepted: true, ignored: true, reason: 'concurrency_guard' };
 
       await this.billingService.applyPaymentTopupInTransaction(tx, payment.userId, payment.id, provider, amount);
+      this.metrics.paymentTopupTotal.inc();
       return { accepted: true, ignored: false, status: 'SUCCESS' };
     });
 
     return result;
+  }
+
+
+  private assertWebhookTimestamp(raw: Record<string, unknown>) {
+    const timestampRaw = raw.timestamp ?? raw.time ?? raw.sign_time;
+    if (!timestampRaw) {
+      throw new BadRequestException('Webhook timestamp is required');
+    }
+
+    const tsValue = Number(timestampRaw);
+    const milliseconds = tsValue > 10_000_000_000 ? tsValue : tsValue * 1000;
+    if (!Number.isFinite(milliseconds)) {
+      throw new BadRequestException('Webhook timestamp is invalid');
+    }
+
+    const driftSeconds = Math.abs(Date.now() - milliseconds) / 1000;
+    if (driftSeconds > this.config.webhookTimestampToleranceSeconds) {
+      throw new BadRequestException('Webhook timestamp drift too large');
+    }
+  }
+
+  private async assertWebhookNonce(provider: PaymentProviderName, dedupeKey: string) {
+    const nonceKey = `webhook:nonce:${provider}:${dedupeKey}`;
+    const inserted = await this.redis.setIfAbsentWithExpiry(nonceKey, '1', this.config.webhookNonceTtlSeconds);
+    if (!inserted) {
+      throw new BadRequestException('Webhook replay detected');
+    }
   }
 
   private getProvider(provider: PaymentProviderName): PaymentProvider {

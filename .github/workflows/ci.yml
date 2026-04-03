@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npx prisma validate
+      - run: npx prisma migrate status
+      - run: npm test
+      - run: npm run build
+      - run: docker build -f Dockerfile.api -t sms-api:${{ github.sha }} .
+      - run: docker build -f Dockerfile.worker -t sms-worker:${{ github.sha }} .

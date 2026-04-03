@@ -1,0 +1,11 @@
+openapi: 3.0.3
+info:
+  title: SMS SaaS API Examples
+  version: 1.0.0
+paths:
+  /sms/send:
+    post:
+      summary: Queue an SMS
+      responses:
+        '202':
+          description: Accepted

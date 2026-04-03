@@ -1,0 +1,12 @@
+{
+  "title": "SMS API Overview",
+  "panels": [
+    {"type": "timeseries", "title": "SMS Sent", "targets": [{"expr": "rate(sms_send_total[5m])"}]},
+    {"type": "timeseries", "title": "SMS Success", "targets": [{"expr": "rate(sms_success_total[5m])"}]},
+    {"type": "timeseries", "title": "SMS Failed", "targets": [{"expr": "rate(sms_failed_total[5m])"}]},
+    {"type": "timeseries", "title": "Payment Topups", "targets": [{"expr": "rate(payment_topup_total[5m])"}]},
+    {"type": "timeseries", "title": "API Latency p95", "targets": [{"expr": "histogram_quantile(0.95, sum(rate(api_request_duration_bucket[5m])) by (le))"}]}
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

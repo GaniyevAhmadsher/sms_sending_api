@@ -23,6 +23,17 @@ export class RedisService {
     return Number(current);
   }
 
+
+  async setIfAbsentWithExpiry(key: string, value: string, ttlSec: number): Promise<boolean> {
+    const result = await this.sendCommandWithRetry(['SET', key, value, 'EX', String(ttlSec), 'NX']);
+    return result === 'OK';
+  }
+
+  async llen(key: string): Promise<number> {
+    const result = await this.sendCommandWithRetry(['LLEN', key]);
+    return Number(result);
+  }
+
   async rpush(key: string, value: string): Promise<number> {
     const result = await this.sendCommandWithRetry(['RPUSH', key, value]);
     return Number(result);

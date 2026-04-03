@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, ServiceUnavailableException } 
 import { PrismaService } from '../../database/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 import { SendSmsDto } from './dto/send-sms.dto';
 
 @Injectable()
@@ -12,10 +13,12 @@ export class SmsService {
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
     private readonly billingService: BillingService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async send(userId: string, dto: SendSmsDto, apiKeyId?: string) {
     this.validatePayload(dto);
+    this.metrics.smsSendTotal.inc();
     const existing = dto.idempotencyKey
       ? await this.prisma.smsMessage.findUnique({
           where: {
@@ -75,6 +78,7 @@ export class SmsService {
           errorMessage: 'Queue enqueue failed',
         },
       });
+      this.metrics.smsFailedTotal.inc();
       throw new ServiceUnavailableException('SMS queue unavailable; message was not scheduled');
     }
 

@@ -7,12 +7,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { RateLimitService } from './rate-limit.service';
 import { SKIP_GLOBAL_THROTTLE } from './skip-global-throttle.decorator';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class GlobalThrottleGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly rateLimitService: RateLimitService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -29,6 +31,7 @@ export class GlobalThrottleGuard implements CanActivate {
     const rate = await this.rateLimitService.consume(`throttle:ip:${ip}`, 200, 60);
 
     if (!rate.allowed) {
+      this.metrics.rateLimitHits.inc({ scope: 'global' });
       throw new HttpException('Global rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
     }
 

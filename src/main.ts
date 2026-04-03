@@ -2,12 +2,15 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AppConfigService } from './infrastructure/config/app-config.service';
+import { PinoLoggerService } from './infrastructure/logging/pino-logger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
-  app.useLogger(['error', 'warn', 'log']);
+
+  const logger = app.get(PinoLoggerService);
+  app.useLogger(logger);
 
   app.useGlobalPipes(
     new ValidationPipe({
