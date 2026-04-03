@@ -49,3 +49,13 @@ npm run start:dev
 - `POST /sms/send` requires `x-api-key` header.
 - Dashboard-like endpoints (`/users/me`, `/billing/*`, `/analytics/*`, `/payments/create`, `/payments/history`) use JWT bearer auth.
 - Webhook endpoints are public but strictly signature-validated: `/payments/webhook/click`, `/payments/webhook/payme`.
+
+
+## Production readiness assets
+- Docker: `Dockerfile.api`, `Dockerfile.worker`
+- Compose stack: `docker-compose.prod.yml`
+- Reverse proxy: `deploy/nginx/nginx.conf`
+- Monitoring: `/metrics`, Prometheus config, Grafana dashboard JSON
+- PM2 fallback: `ecosystem.config.js`
+- Release/ops docs: `docs/`
+- CI/CD: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`
