@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { parseEnv, type AppEnv } from './env.schema';
+import { parseEnv, type EnvSchema } from './env.schema';
 
 @Injectable()
 export class AppConfigService {
-  private readonly env: AppEnv;
+  private readonly env: EnvSchema;
 
   constructor() {
     this.env = parseEnv();
@@ -57,24 +57,8 @@ export class AppConfigService {
     return this.env.JWT_ACCESS_TTL_SECONDS;
   }
 
-  get jwtRefreshTtlSeconds() {
-    return this.env.JWT_REFRESH_TTL_SECONDS;
-  }
-
-  get jwtKeyId() {
-    return this.env.JWT_KEY_ID;
-  }
-
-  get jwtPublicKey() {
-    return this.env.JWT_PUBLIC_KEY;
-  }
-
   get apiKeyHashSecret() {
     return this.env.API_KEY_HASH_SECRET;
-  }
-
-  get apiKeyPrefix() {
-    return this.env.API_KEY_PREFIX;
   }
 
   get smsProvider() {
@@ -101,31 +85,19 @@ export class AppConfigService {
     return this.env.PAYMENT_RETURN_URL;
   }
 
-  get webhookMaxDriftSeconds() {
-    return this.env.WEBHOOK_MAX_DRIFT_SECONDS;
+  get logLevel() {
+    return this.env.LOG_LEVEL;
   }
 
-  get webhookNonceTtlSeconds() {
-    return this.env.WEBHOOK_NONCE_TTL_SECONDS;
-  }
-
-  get defaultDailySpendLimit() {
-    return this.env.DEFAULT_DAILY_SPEND_LIMIT;
-  }
-
-  get allowedSmsCountries() {
-    return this.env.ALLOWED_SMS_COUNTRIES;
-  }
-
-  get otelExporterOtlpEndpoint() {
-    return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  get otelEnabled() {
+    return this.env.OTEL_ENABLED === 'true';
   }
 
   get otelServiceName() {
     return this.env.OTEL_SERVICE_NAME;
   }
 
-  get prometheusEnabled() {
-    return this.env.PROMETHEUS_ENABLED;
+  get otelExporterOtlpEndpoint() {
+    return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   }
 }

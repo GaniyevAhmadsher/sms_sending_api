@@ -1,0 +1,28 @@
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        required: true
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: docker build -f Dockerfile.api -t ${{ secrets.REGISTRY }}/sms-api:${{ github.sha }} .
+      - run: docker build -f Dockerfile.worker -t ${{ secrets.REGISTRY }}/sms-worker:${{ github.sha }} .
+      - run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY }} -u ${{ secrets.REGISTRY_USER }} --password-stdin
+      - run: docker push ${{ secrets.REGISTRY }}/sms-api:${{ github.sha }}
+      - run: docker push ${{ secrets.REGISTRY }}/sms-worker:${{ github.sha }}
+      - name: Deploy marker
+        run: echo "Deploy to ${{ github.event.inputs.environment }} must be wired to your infra target"

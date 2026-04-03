@@ -2,10 +2,12 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { requestContext } from './request-context';
-import { MetricsService } from '../observability/metrics.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class RequestLoggingMiddleware implements NestMiddleware {
+
+  constructor(private readonly metrics: MetricsService) {}
 
   constructor(private readonly metrics: MetricsService) {}
 
@@ -23,26 +25,23 @@ export class RequestLoggingMiddleware implements NestMiddleware {
 
     requestContext.run({ correlationId }, () => {
       res.on('finish', () => {
-        const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
-        this.metrics.apiRequestDuration
-          .labels({ method: req.method, route: req.route?.path ?? req.path ?? 'unknown', status_code: String(res.statusCode) })
-          .observe(durationSeconds);
+        const durationMs = Date.now() - start;
+        this.metrics.apiRequestDuration.observe(
+          { method: req.method, path: req.route?.path ?? req.path, status: String(res.statusCode) },
+          durationMs,
+        );
 
-        console.log(JSON.stringify({
-          correlationId,
-          method: req.method,
-          path: req.originalUrl,
-          statusCode: res.statusCode,
-          durationMs: Math.round(durationSeconds * 1000),
-          userId,
-          tenantId,
-          apiKeyId,
-          paymentId: req.headers['x-payment-id'],
-          smsId: req.headers['x-sms-id'],
-          jobId: req.headers['x-job-id'],
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-        }));
+        this.logger.log(
+          JSON.stringify({
+            correlationId,
+            method: req.method,
+            path: req.originalUrl,
+            statusCode: res.statusCode,
+            durationMs,
+            userId: (req as any).user?.id,
+            apiKeyId: (req as any).user?.apiKeyId,
+          }),
+        );
       });
 
       next();

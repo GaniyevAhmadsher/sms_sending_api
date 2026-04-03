@@ -19,8 +19,8 @@ import { QueueConnectionModule } from './infrastructure/queue/queue-connection.m
 import { HealthModule } from './modules/health/health.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RequestLoggingMiddleware } from './infrastructure/logging/request-logging.middleware';
-import { ObservabilityModule } from './infrastructure/observability/observability.module';
-import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { MetricsModule } from './infrastructure/metrics/metrics.module';
+import { PinoLoggerService } from './infrastructure/logging/pino-logger.service';
 
 @Module({
   imports: [
@@ -28,6 +28,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     PrismaModule,
     RedisModule,
     RateLimitModule,
+    MetricsModule,
     QueueConnectionModule,
     AuthModule,
     UsersModule,
@@ -45,6 +46,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
   controllers: [AppController],
   providers: [
     AppService,
+    PinoLoggerService,
     {
       provide: APP_GUARD,
       useClass: GlobalThrottleGuard,

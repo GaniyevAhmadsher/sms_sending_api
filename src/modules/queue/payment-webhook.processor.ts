@@ -8,6 +8,7 @@ import {
   PROCESS_PAYMENT_WEBHOOK_JOB,
 } from './queue.constants';
 import type { PaymentWebhookJobPayload } from './queue.service';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 
 @Injectable()
 export class PaymentWebhookProcessor implements OnModuleInit, OnModuleDestroy {
@@ -18,6 +19,7 @@ export class PaymentWebhookProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   onModuleInit() {
@@ -40,8 +42,11 @@ export class PaymentWebhookProcessor implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const start = Date.now();
     try {
       await this.paymentsService.processWebhookEvent(payload.eventId);
+      this.metrics.webhookLatency.observe({ provider: payload.provider }, Date.now() - start);
+      this.metrics.queueDepth.dec({ queue: 'payment_webhook' });
       await this.prisma.webhookEvent.update({ where: { id: payload.eventId }, data: { status: 'PROCESSED' } });
       this.logger.log(`${PROCESS_PAYMENT_WEBHOOK_JOB} success event=${payload.eventId}`);
     } catch (error) {
@@ -52,11 +57,13 @@ export class PaymentWebhookProcessor implements OnModuleInit, OnModuleDestroy {
           PAYMENT_WEBHOOK_QUEUE,
           JSON.stringify({ ...payload, attempt: attempt + 1, retryAt: Date.now() + delayMs }),
         );
+        this.metrics.queueRetryTotal.inc({ queue: 'payment_webhook' });
         await this.prisma.webhookEvent.update({
           where: { id: payload.eventId },
           data: { status: 'RETRYING', attempts: attempt + 1, lastError: error instanceof Error ? error.message : 'Unknown' },
         });
       } else {
+        this.metrics.dlqSize.inc({ queue: 'payment_webhook' });
         await this.redisService.rpush(
           PAYMENT_WEBHOOK_DLQ,
           JSON.stringify({ ...payload, finalError: error instanceof Error ? error.message : 'Unknown' }),

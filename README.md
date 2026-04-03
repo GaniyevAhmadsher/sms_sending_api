@@ -20,26 +20,17 @@ npx prisma generate
 npm run start:dev
 ```
 
-## Production Start (Docker)
-```bash
-cp .env.example .env
-docker compose -f docker-compose.production.yml up -d --build
-```
+## Notes
+- `POST /sms/send` requires `x-api-key` header.
+- Dashboard-like endpoints (`/users/me`, `/billing/*`, `/analytics/*`, `/payments/create`, `/payments/history`) use JWT bearer auth.
+- Webhook endpoints are public but strictly signature-validated: `/payments/webhook/click`, `/payments/webhook/payme`.
 
-## Key Endpoints
-- Health: `GET /health`
-- Metrics: `GET /metrics`
-- Send SMS: `POST /sms/send` (`x-api-key`)
-- Payments webhook:
-  - `POST /payments/webhook/click`
-  - `POST /payments/webhook/payme`
 
-## Docs
-- `DEPLOYMENT.md`
-- `RUNBOOK.md`
-- `INCIDENT_RESPONSE.md`
-- `SCALING.md`
-- `BACKUP_RECOVERY.md`
-- `SECURITY.md`
-- `CUSTOMER_API_GUIDE.md`
-- `RELEASE_CHECKLIST.md`
+## Production readiness assets
+- Docker: `Dockerfile.api`, `Dockerfile.worker`
+- Compose stack: `docker-compose.prod.yml`
+- Reverse proxy: `deploy/nginx/nginx.conf`
+- Monitoring: `/metrics`, Prometheus config, Grafana dashboard JSON
+- PM2 fallback: `ecosystem.config.js`
+- Release/ops docs: `docs/`
+- CI/CD: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`
