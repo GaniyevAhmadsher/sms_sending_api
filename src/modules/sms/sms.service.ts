@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { SendSmsDto } from './dto/send-sms.dto';
+import { MetricsService } from '../../infrastructure/observability/metrics.service';
 
 @Injectable()
 export class SmsService {
@@ -12,6 +13,7 @@ export class SmsService {
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
     private readonly billingService: BillingService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async send(userId: string, dto: SendSmsDto, apiKeyId?: string) {
@@ -28,6 +30,7 @@ export class SmsService {
       : null;
 
     if (existing) {
+      this.metrics.smsSendTotal.labels().inc();
       return {
         id: existing.id,
         status: existing.status,
@@ -55,6 +58,8 @@ export class SmsService {
 
       return created;
     });
+
+    this.metrics.smsSendTotal.labels().inc();
 
     try {
       await this.queueService.enqueueSmsJob({

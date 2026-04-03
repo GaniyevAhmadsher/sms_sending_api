@@ -1,0 +1,14 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {"type": "timeseries", "title": "SMS Sent", "targets": [{"expr": "sms_send_total"}], "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}},
+    {"type": "timeseries", "title": "SMS Success", "targets": [{"expr": "sms_success_total"}], "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}},
+    {"type": "timeseries", "title": "SMS Failed", "targets": [{"expr": "sms_failed_total"}], "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}},
+    {"type": "timeseries", "title": "Payment Topups", "targets": [{"expr": "payment_topup_total"}], "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}}
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "title": "SMS SaaS Overview",
+  "version": 1
+}

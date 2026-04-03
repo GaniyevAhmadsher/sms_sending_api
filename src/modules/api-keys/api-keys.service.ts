@@ -14,7 +14,7 @@ export class ApiKeysService {
     if (label && label.length > 50) {
       throw new BadRequestException('Label too long');
     }
-    const rawKey = `sms_${crypto.randomBytes(24).toString('hex')}`;
+    const rawKey = `${this.config.apiKeyPrefix}${crypto.randomBytes(24).toString('hex')}`;
     const keyHash = this.hashApiKey(rawKey);
 
     const apiKey = await this.prisma.apiKey.create({
@@ -43,7 +43,7 @@ export class ApiKeysService {
   }
 
   hashApiKey(key: string) {
-    if (!key.startsWith('sms_')) {
+    if (!key.startsWith(this.config.apiKeyPrefix)) {
       throw new BadRequestException('Malformed API key');
     }
 

@@ -4,6 +4,7 @@ import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
+import { MetricsService } from '../../infrastructure/observability/metrics.service';
 
 @Injectable()
 export class PaymentsService {
@@ -14,6 +15,7 @@ export class PaymentsService {
     private readonly billingService: BillingService,
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
+    private readonly metrics: MetricsService,
   ) {
     this.providers = providers;
   }
@@ -52,6 +54,7 @@ export class PaymentsService {
   }
 
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
+    const startedAt = process.hrtime.bigint();
     const provider = this.getProvider(providerName);
     const payload = provider.verifyWebhook(headers, body);
 
@@ -73,6 +76,9 @@ export class PaymentsService {
 
     await this.queueService.enqueuePaymentWebhookJob({ eventId: event.id, provider: providerName, jobId: `payment:${event.id}` });
     await this.prisma.webhookEvent.update({ where: { id: event.id }, data: { status: 'QUEUED' } });
+
+    const latencySeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
+    this.metrics.webhookLatency.labels({ provider: providerName }).observe(latencySeconds);
 
     return { accepted: true };
   }
@@ -113,6 +119,7 @@ export class PaymentsService {
       }
 
       if (payload.status === 'FAILED' || payload.status === 'CANCELED') {
+        this.metrics.paymentFailedTotal.labels({ provider, reason: payload.status.toLowerCase() }).inc();
         await tx.payment.update({ where: { id: payment.id }, data: { status: payload.status } });
         return { accepted: true, ignored: false, status: payload.status };
       }
@@ -127,6 +134,7 @@ export class PaymentsService {
       if (updated.count !== 1) return { accepted: true, ignored: true, reason: 'concurrency_guard' };
 
       await this.billingService.applyPaymentTopupInTransaction(tx, payment.userId, payment.id, provider, amount);
+      this.metrics.paymentTopupTotal.labels({ provider }).inc();
       return { accepted: true, ignored: false, status: 'SUCCESS' };
     });
 
