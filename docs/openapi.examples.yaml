@@ -1,0 +1,11 @@
+openapi: 3.0.3
+info:
+  title: SMS Sending API Examples
+  version: 1.0.0
+paths:
+  /sms/send:
+    post:
+      summary: Send SMS
+      responses:
+        '202':
+          description: Accepted

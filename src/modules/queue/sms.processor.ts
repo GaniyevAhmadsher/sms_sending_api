@@ -4,6 +4,7 @@ import { SMS_PROVIDER_TOKEN } from '../providers/providers.constants';
 import type { SmsProvider } from '../providers/providers.interface';
 import { BULLMQ_CONNECTION, SMS_DLQ, SMS_QUEUE } from './queue.constants';
 import type { SmsJobPayload } from './sms.queue';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 
 interface SmsJob {
   id?: string;
@@ -33,6 +34,7 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     @Inject(BULLMQ_CONNECTION) private readonly connection: any,
     @Inject(SMS_PROVIDER_TOKEN) private readonly smsProvider: SmsProvider,
+    private readonly metrics: MetricsService,
   ) {}
 
   async onModuleInit() {
@@ -102,10 +104,14 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    const providerStart = Date.now();
     const result = await this.smsProvider.send({
       to: sms.toPhoneNumber,
       body: sms.body,
     });
+
+    this.metrics.providerLatency.observe({ provider: result.provider }, Date.now() - providerStart);
+    this.metrics.smsSuccessTotal.inc();
 
     await this.prisma.smsMessage.update({
       where: { id: payload.smsId },
@@ -127,6 +133,8 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
     const attempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1;
     const attemptsMade = job.attemptsMade;
     this.logger.error(`job failed id=${job.id} attempt=${attemptsMade}/${attempts} error=${error.message}`);
+    this.metrics.smsFailedTotal.inc();
+    this.metrics.queueRetryTotal.inc({ queue: 'sms' });
 
     if (attemptsMade >= attempts) {
       await this.prisma.smsMessage.update({
@@ -146,6 +154,8 @@ export class SmsProcessor implements OnModuleInit, OnModuleDestroy {
           failedAt: new Date().toISOString(),
         }),
       );
+      const dlqSize = await this.connection.llen(SMS_DLQ);
+      this.metrics.dlqSize.set({ queue: 'sms' }, dlqSize);
     }
   }
 }

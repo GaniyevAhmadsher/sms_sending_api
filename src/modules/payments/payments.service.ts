@@ -4,6 +4,7 @@ import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 
 @Injectable()
 export class PaymentsService {
@@ -14,6 +15,7 @@ export class PaymentsService {
     private readonly billingService: BillingService,
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
+    private readonly metrics: MetricsService,
   ) {
     this.providers = providers;
   }
@@ -113,12 +115,14 @@ export class PaymentsService {
       }
 
       if (payload.status === 'FAILED' || payload.status === 'CANCELED') {
+        this.metrics.paymentFailedTotal.inc();
         await tx.payment.update({ where: { id: payment.id }, data: { status: payload.status } });
         return { accepted: true, ignored: false, status: payload.status };
       }
 
       const amount = Number(payment.amount);
       if (Math.abs(payload.amount - amount) > 0.0001) {
+        this.metrics.paymentFailedTotal.inc();
         await tx.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
         return { accepted: true, ignored: false, status: 'FAILED', reason: 'amount_mismatch' };
       }
@@ -127,6 +131,7 @@ export class PaymentsService {
       if (updated.count !== 1) return { accepted: true, ignored: true, reason: 'concurrency_guard' };
 
       await this.billingService.applyPaymentTopupInTransaction(tx, payment.userId, payment.id, provider, amount);
+      this.metrics.paymentTopupTotal.inc();
       return { accepted: true, ignored: false, status: 'SUCCESS' };
     });
 

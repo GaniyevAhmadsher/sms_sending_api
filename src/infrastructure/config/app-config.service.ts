@@ -1,109 +1,103 @@
 import { Injectable } from '@nestjs/common';
+import { parseEnv, type EnvSchema } from './env.schema';
 
 @Injectable()
 export class AppConfigService {
-  private getRequired(name: string): string {
-    const value = process.env[name];
-    if (!value || value.trim().length === 0) {
-      throw new Error(`Missing required environment variable: ${name}`);
-    }
+  private readonly env: EnvSchema;
 
-    return value;
-  }
-
-  private getRequiredNumber(name: string): number {
-    const raw = this.getRequired(name);
-    const value = Number(raw);
-    if (!Number.isFinite(value)) {
-      throw new Error(`Invalid numeric environment variable: ${name}`);
-    }
-
-    return value;
+  constructor() {
+    this.env = parseEnv();
   }
 
   validate() {
-    this.databaseUrl;
-    this.redisHost;
-    this.redisPort;
-    this.redisCommandTimeoutMs;
-    this.jwtSecret;
-    this.jwtIssuer;
-    this.jwtAudience;
-    this.jwtAccessTtlSeconds;
-    this.apiKeyHashSecret;
-    this.clickMerchantId;
-    this.clickSecretKey;
-    this.paymeMerchantId;
-    this.paymeSecretKey;
-    this.paymentReturnUrl;
+    return this.env;
+  }
+
+  get nodeEnv() {
+    return this.env.NODE_ENV;
   }
 
   get port() {
-    return this.getRequiredNumber('PORT');
+    return this.env.PORT;
   }
 
   get databaseUrl() {
-    return this.getRequired('DATABASE_URL');
+    return this.env.DATABASE_URL;
   }
 
   get redisHost() {
-    return this.getRequired('REDIS_HOST');
+    return this.env.REDIS_HOST;
   }
 
   get redisPort() {
-    return this.getRequiredNumber('REDIS_PORT');
+    return this.env.REDIS_PORT;
   }
 
   get redisCommandTimeoutMs() {
-    return this.getRequiredNumber('REDIS_COMMAND_TIMEOUT_MS');
+    return this.env.REDIS_COMMAND_TIMEOUT_MS;
   }
 
   get redisPassword() {
-    const value = process.env.REDIS_PASSWORD;
-    return value && value.trim().length > 0 ? value : undefined;
+    return this.env.REDIS_PASSWORD;
   }
 
   get jwtSecret() {
-    return this.getRequired('JWT_SECRET');
+    return this.env.JWT_SECRET;
   }
 
   get jwtIssuer() {
-    return this.getRequired('JWT_ISSUER');
+    return this.env.JWT_ISSUER;
   }
 
   get jwtAudience() {
-    return this.getRequired('JWT_AUDIENCE');
+    return this.env.JWT_AUDIENCE;
   }
 
   get jwtAccessTtlSeconds() {
-    return this.getRequiredNumber('JWT_ACCESS_TTL_SECONDS');
+    return this.env.JWT_ACCESS_TTL_SECONDS;
   }
 
   get apiKeyHashSecret() {
-    return this.getRequired('API_KEY_HASH_SECRET');
+    return this.env.API_KEY_HASH_SECRET;
   }
 
   get smsProvider() {
-    return this.getRequired('SMS_PROVIDER');
+    return this.env.SMS_PROVIDER;
   }
 
   get clickMerchantId() {
-    return this.getRequired('CLICK_MERCHANT_ID');
+    return this.env.CLICK_MERCHANT_ID;
   }
 
   get clickSecretKey() {
-    return this.getRequired('CLICK_SECRET_KEY');
+    return this.env.CLICK_SECRET_KEY;
   }
 
   get paymeMerchantId() {
-    return this.getRequired('PAYME_MERCHANT_ID');
+    return this.env.PAYME_MERCHANT_ID;
   }
 
   get paymeSecretKey() {
-    return this.getRequired('PAYME_SECRET_KEY');
+    return this.env.PAYME_SECRET_KEY;
   }
 
   get paymentReturnUrl() {
-    return this.getRequired('PAYMENT_RETURN_URL');
+    return this.env.PAYMENT_RETURN_URL;
+  }
+
+  get logLevel() {
+    return this.env.LOG_LEVEL;
+  }
+
+  get otelEnabled() {
+    return this.env.OTEL_ENABLED === 'true';
+  }
+
+  get otelServiceName() {
+    return this.env.OTEL_SERVICE_NAME;
+  }
+
+  get otelExporterOtlpEndpoint() {
+    return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   }
 }
