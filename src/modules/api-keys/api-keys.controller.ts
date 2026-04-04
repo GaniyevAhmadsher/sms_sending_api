@@ -11,15 +11,17 @@ export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Post()
-  create(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateApiKeyDto,
-  ) {
-    return this.apiKeysService.create(user.id, dto.label);
+  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateApiKeyDto) {
+    return this.apiKeysService.create(user.id, dto.label, dto.scopes, dto.expiresInDays);
   }
 
   @Delete(':id')
   revoke(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.apiKeysService.revoke(user.id, id);
+  }
+
+  @Delete()
+  revokeAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.apiKeysService.revokeAll(user.id);
   }
 }

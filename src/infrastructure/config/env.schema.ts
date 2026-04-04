@@ -10,7 +10,9 @@ export interface EnvSchema {
   JWT_ISSUER: string;
   JWT_AUDIENCE: string;
   JWT_ACCESS_TTL_SECONDS: number;
+  JWT_REFRESH_TTL_SECONDS: number;
   API_KEY_HASH_SECRET: string;
+  API_KEY_PREFIX: string;
   SMS_PROVIDER: string;
   CLICK_MERCHANT_ID: string;
   CLICK_SECRET_KEY: string;
@@ -21,6 +23,8 @@ export interface EnvSchema {
   OTEL_ENABLED: 'true' | 'false';
   OTEL_SERVICE_NAME: string;
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+  WEBHOOK_MAX_DRIFT_SECONDS: number;
+  WEBHOOK_NONCE_TTL_SECONDS: number;
 }
 
 function req(name: string): string {
@@ -52,7 +56,9 @@ export function parseEnv(): EnvSchema {
     JWT_ISSUER: req('JWT_ISSUER'),
     JWT_AUDIENCE: req('JWT_AUDIENCE'),
     JWT_ACCESS_TTL_SECONDS: num('JWT_ACCESS_TTL_SECONDS', 900),
+    JWT_REFRESH_TTL_SECONDS: num('JWT_REFRESH_TTL_SECONDS', 2592000),
     API_KEY_HASH_SECRET: req('API_KEY_HASH_SECRET'),
+    API_KEY_PREFIX: process.env.API_KEY_PREFIX ?? 'sk_live_',
     SMS_PROVIDER: req('SMS_PROVIDER'),
     CLICK_MERCHANT_ID: req('CLICK_MERCHANT_ID'),
     CLICK_SECRET_KEY: req('CLICK_SECRET_KEY'),
@@ -63,6 +69,8 @@ export function parseEnv(): EnvSchema {
     OTEL_ENABLED: process.env.OTEL_ENABLED === 'true' ? 'true' : 'false',
     OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME ?? 'sms-sending-api',
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    WEBHOOK_MAX_DRIFT_SECONDS: num('WEBHOOK_MAX_DRIFT_SECONDS', 300),
+    WEBHOOK_NONCE_TTL_SECONDS: num('WEBHOOK_NONCE_TTL_SECONDS', 600),
   };
 
   if (env.JWT_SECRET.length < 32 || env.API_KEY_HASH_SECRET.length < 32) {

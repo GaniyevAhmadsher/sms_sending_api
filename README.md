@@ -9,6 +9,9 @@ Production-oriented NestJS backend for multi-tenant SMS delivery with JWT auth, 
 - `/metrics` endpoint and in-app business metrics
 - Structured JSON request logs with correlation ID
 - Strict environment validation (fail-fast startup)
+- Rotating refresh token flow with revocation persistence
+- API key scopes, expirations, masking, and bulk revoke
+- Webhook replay protection (timestamp drift + nonce cache via Redis)
 - PM2 ecosystem for non-container deployments
 - CI/CD workflow with lint/test/build/prisma/docker/deploy stages
 - Release and operations docs (runbook, incident response, scaling, backups)
