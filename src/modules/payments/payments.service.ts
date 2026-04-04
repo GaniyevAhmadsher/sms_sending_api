@@ -5,6 +5,8 @@ import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
 import { MetricsService } from '../../infrastructure/metrics/metrics.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
+import { AppConfigService } from '../../infrastructure/config/app-config.service';
 
 @Injectable()
 export class PaymentsService {
@@ -16,6 +18,8 @@ export class PaymentsService {
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
     private readonly metrics: MetricsService,
+    private readonly redis: RedisService,
+    private readonly config: AppConfigService,
   ) {
     this.providers = providers;
   }
@@ -55,6 +59,7 @@ export class PaymentsService {
 
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
     const startedAt = process.hrtime.bigint();
+    await this.validateWebhookReplay(headers);
     const provider = this.getProvider(providerName);
     const payload = provider.verifyWebhook(headers, body);
 
@@ -140,6 +145,35 @@ export class PaymentsService {
     });
 
     return result;
+  }
+
+
+  private async validateWebhookReplay(headers: Record<string, string | string[] | undefined>) {
+    const tsHeader = this.headerValue(headers, 'x-webhook-timestamp');
+    const nonce = this.headerValue(headers, 'x-webhook-nonce');
+    if (!tsHeader || !nonce) return;
+
+    const timestamp = Number(tsHeader);
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(timestamp)) {
+      throw new BadRequestException('Invalid webhook timestamp header');
+    }
+
+    if (Math.abs(now - timestamp) > this.config.webhookTimestampToleranceSeconds) {
+      throw new BadRequestException('Webhook timestamp outside allowed drift');
+    }
+
+    const nonceKey = `webhook_nonce:${nonce}`;
+    const seenCount = await this.redis.incrementWithExpiry(nonceKey, this.config.webhookNonceTtlSeconds);
+    if (seenCount > 1) {
+      throw new BadRequestException('Webhook replay detected');
+    }
+  }
+
+  private headerValue(headers: Record<string, string | string[] | undefined>, key: string): string | undefined {
+    const value = headers[key] ?? headers[key.toLowerCase()];
+    if (Array.isArray(value)) return value[0];
+    return typeof value === 'string' ? value : undefined;
   }
 
   private getProvider(provider: PaymentProviderName): PaymentProvider {

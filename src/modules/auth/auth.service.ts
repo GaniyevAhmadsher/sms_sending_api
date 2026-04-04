@@ -67,8 +67,17 @@ export class AuthService {
     return this.issueToken(user.id);
   }
 
+  refreshToken(refreshToken: string) {
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
+    return this.issueToken(payload.sub);
+  }
+
   private issueToken(userId: string) {
-    return { accessToken: this.tokenService.sign({ sub: userId }), tokenType: 'Bearer' };
+    return {
+      accessToken: this.tokenService.sign({ sub: userId }),
+      refreshToken: this.tokenService.signRefreshToken({ sub: userId }),
+      tokenType: 'Bearer',
+    };
   }
 
   private hashPassword(password: string) {

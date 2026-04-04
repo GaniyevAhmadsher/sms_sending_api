@@ -1,17 +1,18 @@
 # Customer API Guide
 
 ## Onboarding flow
-1. Register user
-2. Login and get JWT
-3. Create API key
-4. Top up wallet via Click/Payme
-5. Send SMS with `x-api-key`
+1. `POST /auth/register`
+2. `POST /auth/login`
+3. `POST /onboarding/api-keys`
+4. `POST /onboarding/wallet/fund`
+5. `POST /sms/send`
 
-## Core endpoints
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /api-keys`
-- `POST /payments/create`
-- `GET /payments/history`
-- `POST /sms/send`
-- `GET /analytics/*`
+## Customer operations
+- Usage: `GET /onboarding/usage`
+- Invoices: `GET /onboarding/invoices`
+- Delivery report: `GET /onboarding/delivery-report`
+- Callback registration: `POST /onboarding/webhook-callbacks`
+
+## Auth
+- User APIs: Bearer JWT
+- Sending API: `x-api-key`
