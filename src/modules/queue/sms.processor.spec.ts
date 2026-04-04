@@ -1,16 +1,24 @@
 import { SmsProcessor } from './sms.processor';
 
 describe('SmsProcessor', () => {
+  const metrics = {
+    providerLatency: { observe: jest.fn() },
+    smsSuccessTotal: { inc: jest.fn() },
+    smsFailedTotal: { inc: jest.fn(), labels: jest.fn().mockReturnValue({ inc: jest.fn() }) },
+    queueRetryTotal: { inc: jest.fn() },
+    dlqSize: { set: jest.fn() },
+  } as any;
+
   it('marks SMS as FAILED and writes to dlq on final failure', async () => {
     const prisma = {
       smsMessage: {
         update: jest.fn(),
       },
     } as any;
-    const connection = { rpush: jest.fn().mockResolvedValue(1) } as any;
+    const connection = { rpush: jest.fn().mockResolvedValue(1), llen: jest.fn().mockResolvedValue(1) } as any;
     const provider = { send: jest.fn() } as any;
 
-    const processor = new SmsProcessor(prisma, connection, provider);
+    const processor = new SmsProcessor(prisma, connection, provider, metrics);
 
     await processor.onJobFailed(
       {
@@ -43,10 +51,10 @@ describe('SmsProcessor', () => {
         update: jest.fn(),
       },
     } as any;
-    const connection = { rpush: jest.fn() } as any;
+    const connection = { rpush: jest.fn(), llen: jest.fn() } as any;
     const provider = { send: jest.fn() } as any;
 
-    const processor = new SmsProcessor(prisma, connection, provider);
+    const processor = new SmsProcessor(prisma, connection, provider, metrics);
     const result = await processor.processSendSms({
       id: 'sms:s1',
       data: { smsId: 's1', userId: 'u1' },
@@ -71,10 +79,10 @@ describe('SmsProcessor', () => {
         update: jest.fn(),
       },
     } as any;
-    const connection = { rpush: jest.fn() } as any;
+    const connection = { rpush: jest.fn(), llen: jest.fn() } as any;
     const provider = { send: jest.fn().mockRejectedValue(new Error('temporary outage')) } as any;
 
-    const processor = new SmsProcessor(prisma, connection, provider);
+    const processor = new SmsProcessor(prisma, connection, provider, metrics);
 
     await expect(
       processor.processSendSms({
