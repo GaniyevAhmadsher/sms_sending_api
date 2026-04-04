@@ -7,11 +7,15 @@ export interface EnvSchema {
   REDIS_PASSWORD?: string;
   REDIS_COMMAND_TIMEOUT_MS: number;
   JWT_SECRET: string;
+  JWT_PREVIOUS_SECRET?: string;
   JWT_ISSUER: string;
   JWT_AUDIENCE: string;
   JWT_ACCESS_TTL_SECONDS: number;
+  JWT_REFRESH_TTL_SECONDS: number;
   API_KEY_HASH_SECRET: string;
   API_KEY_PREFIX: string;
+  WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: number;
+  WEBHOOK_NONCE_TTL_SECONDS: number;
   SMS_PROVIDER: string;
   CLICK_MERCHANT_ID: string;
   CLICK_SECRET_KEY: string;
@@ -48,15 +52,19 @@ export function parseEnv(): EnvSchema {
     PORT: num('PORT', 3000),
     DATABASE_URL: req('DATABASE_URL'),
     REDIS_HOST: req('REDIS_HOST'),
-    REDIS_PORT: num('REDIS_PORT'),
+    REDIS_PORT: num('REDIS_PORT', 6379),
     REDIS_PASSWORD: process.env.REDIS_PASSWORD,
     REDIS_COMMAND_TIMEOUT_MS: num('REDIS_COMMAND_TIMEOUT_MS', 2000),
     JWT_SECRET: req('JWT_SECRET'),
+    JWT_PREVIOUS_SECRET: process.env.JWT_PREVIOUS_SECRET,
     JWT_ISSUER: req('JWT_ISSUER'),
     JWT_AUDIENCE: req('JWT_AUDIENCE'),
     JWT_ACCESS_TTL_SECONDS: num('JWT_ACCESS_TTL_SECONDS', 900),
+    JWT_REFRESH_TTL_SECONDS: num('JWT_REFRESH_TTL_SECONDS', 2592000),
     API_KEY_HASH_SECRET: req('API_KEY_HASH_SECRET'),
     API_KEY_PREFIX: process.env.API_KEY_PREFIX ?? 'sms_live_',
+    WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: num('WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS', 300),
+    WEBHOOK_NONCE_TTL_SECONDS: num('WEBHOOK_NONCE_TTL_SECONDS', 600),
     SMS_PROVIDER: req('SMS_PROVIDER'),
     CLICK_MERCHANT_ID: req('CLICK_MERCHANT_ID'),
     CLICK_SECRET_KEY: req('CLICK_SECRET_KEY'),
@@ -83,16 +91,8 @@ export function parseEnv(): EnvSchema {
     throw new Error('JWT_SECRET and API_KEY_HASH_SECRET must be at least 32 chars long');
   }
 
-  if (!/^sms_[a-z]+_$/i.test(env.API_KEY_PREFIX)) {
-    throw new Error('API_KEY_PREFIX must match format like sms_live_ or sms_test_');
-  }
-
-  if (env.WEBHOOK_MAX_DRIFT_SECONDS < 30 || env.WEBHOOK_MAX_DRIFT_SECONDS > 3600) {
-    throw new Error('WEBHOOK_MAX_DRIFT_SECONDS must be in range [30, 3600]');
-  }
-
-  if (env.WEBHOOK_NONCE_TTL_SECONDS < env.WEBHOOK_MAX_DRIFT_SECONDS) {
-    throw new Error('WEBHOOK_NONCE_TTL_SECONDS must be >= WEBHOOK_MAX_DRIFT_SECONDS');
+  if (!/^sms_(live|test)_/.test(env.API_KEY_PREFIX)) {
+    throw new Error('API_KEY_PREFIX must start with sms_live_ or sms_test_');
   }
 
   return env;

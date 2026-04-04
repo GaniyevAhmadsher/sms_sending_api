@@ -21,7 +21,6 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { RequestLoggingMiddleware } from './infrastructure/logging/request-logging.middleware';
 import { MetricsModule } from './infrastructure/metrics/metrics.module';
 import { PinoLoggerService } from './infrastructure/logging/pino-logger.service';
-import { ObservabilityModule } from './infrastructure/observability/observability.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
 @Module({
@@ -42,7 +41,6 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     AnalyticsModule,
     HealthModule,
     PaymentsModule,
-    ObservabilityModule,
     OnboardingModule,
   ],
   controllers: [AppController],

@@ -15,10 +15,22 @@ export class AnalyticsController {
   }
 
   @Get('usage-logs')
-  usageLogs(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('limit') limit?: string,
-  ) {
+  usageLogs(@CurrentUser() user: AuthenticatedUser, @Query('limit') limit?: string) {
     return this.analyticsService.getUsageLogs(user.id, Number(limit) || 50);
+  }
+
+  @Get('daily-usage')
+  dailyUsage(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getDailyUsage(user.id);
+  }
+
+  @Get('provider-success-rate')
+  providerSuccessRate(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getProviderSuccessRate(user.id);
+  }
+
+  @Get('revenue-dashboard')
+  revenueDashboard() {
+    return this.analyticsService.getRevenueDashboard();
   }
 }
