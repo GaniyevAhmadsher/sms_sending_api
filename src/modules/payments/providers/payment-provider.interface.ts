@@ -18,6 +18,8 @@ export interface VerifiedWebhook {
   amount: number;
   raw: Record<string, unknown>;
   dedupeKey: string;
+  eventTimestamp: Date;
+  nonce: string;
 }
 
 export interface PaymentProvider {

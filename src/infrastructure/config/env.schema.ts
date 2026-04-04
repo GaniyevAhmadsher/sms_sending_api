@@ -7,9 +7,17 @@ export interface EnvSchema {
   REDIS_PASSWORD?: string;
   REDIS_COMMAND_TIMEOUT_MS: number;
   JWT_SECRET: string;
+  JWT_SECRET_KID: string;
+  JWT_SECRET_ROTATION: string;
+  JWT_REFRESH_SECRET: string;
+  JWT_REFRESH_SECRET_KID: string;
+  JWT_REFRESH_SECRET_ROTATION: string;
   JWT_ISSUER: string;
   JWT_AUDIENCE: string;
   JWT_ACCESS_TTL_SECONDS: number;
+  JWT_REFRESH_TTL_SECONDS: number;
+  WEBHOOK_MAX_DRIFT_SECONDS: number;
+  WEBHOOK_NONCE_TTL_SECONDS: number;
   API_KEY_HASH_SECRET: string;
   SMS_PROVIDER: string;
   CLICK_MERCHANT_ID: string;
@@ -36,6 +44,22 @@ function num(name: string, fallback?: number): number {
   return value;
 }
 
+function parseRotation(raw: string): string {
+  const items = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const item of items) {
+    const [kid, secret] = item.split(':');
+    if (!kid || !secret || secret.length < 32) {
+      throw new Error('JWT rotation values must be formatted as kid:secret and secret should be >=32 chars');
+    }
+  }
+
+  return items.join(',');
+}
+
 export function parseEnv(): EnvSchema {
   const nodeEnv = (process.env.NODE_ENV ?? 'development') as EnvSchema['NODE_ENV'];
   const logLevel = (process.env.LOG_LEVEL ?? 'info') as EnvSchema['LOG_LEVEL'];
@@ -49,9 +73,17 @@ export function parseEnv(): EnvSchema {
     REDIS_PASSWORD: process.env.REDIS_PASSWORD,
     REDIS_COMMAND_TIMEOUT_MS: num('REDIS_COMMAND_TIMEOUT_MS', 2000),
     JWT_SECRET: req('JWT_SECRET'),
+    JWT_SECRET_KID: process.env.JWT_SECRET_KID ?? 'v1',
+    JWT_SECRET_ROTATION: parseRotation(process.env.JWT_SECRET_ROTATION ?? ''),
+    JWT_REFRESH_SECRET: req('JWT_REFRESH_SECRET'),
+    JWT_REFRESH_SECRET_KID: process.env.JWT_REFRESH_SECRET_KID ?? 'r1',
+    JWT_REFRESH_SECRET_ROTATION: parseRotation(process.env.JWT_REFRESH_SECRET_ROTATION ?? ''),
     JWT_ISSUER: req('JWT_ISSUER'),
     JWT_AUDIENCE: req('JWT_AUDIENCE'),
     JWT_ACCESS_TTL_SECONDS: num('JWT_ACCESS_TTL_SECONDS', 900),
+    JWT_REFRESH_TTL_SECONDS: num('JWT_REFRESH_TTL_SECONDS', 1209600),
+    WEBHOOK_MAX_DRIFT_SECONDS: num('WEBHOOK_MAX_DRIFT_SECONDS', 300),
+    WEBHOOK_NONCE_TTL_SECONDS: num('WEBHOOK_NONCE_TTL_SECONDS', 900),
     API_KEY_HASH_SECRET: req('API_KEY_HASH_SECRET'),
     SMS_PROVIDER: req('SMS_PROVIDER'),
     CLICK_MERCHANT_ID: req('CLICK_MERCHANT_ID'),
@@ -65,8 +97,8 @@ export function parseEnv(): EnvSchema {
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
   };
 
-  if (env.JWT_SECRET.length < 32 || env.API_KEY_HASH_SECRET.length < 32) {
-    throw new Error('JWT_SECRET and API_KEY_HASH_SECRET must be at least 32 chars long');
+  if (env.JWT_SECRET.length < 32 || env.JWT_REFRESH_SECRET.length < 32 || env.API_KEY_HASH_SECRET.length < 32) {
+    throw new Error('JWT_SECRET, JWT_REFRESH_SECRET and API_KEY_HASH_SECRET must be at least 32 chars long');
   }
 
   return env;

@@ -1,10 +1,12 @@
-import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
 import { MetricsService } from '../../infrastructure/metrics/metrics.service';
+import { AppConfigService } from '../../infrastructure/config/app-config.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
 
 @Injectable()
 export class PaymentsService {
@@ -16,6 +18,8 @@ export class PaymentsService {
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
     private readonly metrics: MetricsService,
+    private readonly config: AppConfigService,
+    private readonly redis: RedisService,
   ) {
     this.providers = providers;
   }
@@ -57,6 +61,9 @@ export class PaymentsService {
     const startedAt = process.hrtime.bigint();
     const provider = this.getProvider(providerName);
     const payload = provider.verifyWebhook(headers, body);
+
+    this.assertWebhookTimestamp(payload);
+    await this.assertWebhookNonce(providerName, payload);
 
     const event = await this.prisma.webhookEvent.upsert({
       where: { dedupeKey: payload.dedupeKey },
@@ -140,6 +147,21 @@ export class PaymentsService {
     });
 
     return result;
+  }
+
+  private assertWebhookTimestamp(payload: VerifiedWebhook) {
+    const driftMs = Math.abs(Date.now() - payload.eventTimestamp.getTime());
+    if (driftMs > this.config.webhookMaxDriftSeconds * 1000) {
+      throw new ForbiddenException('Webhook timestamp drift exceeded');
+    }
+  }
+
+  private async assertWebhookNonce(provider: PaymentProviderName, payload: VerifiedWebhook) {
+    const key = `webhook:nonce:${provider}:${payload.nonce}`;
+    const accepted = await this.redis.setIfNotExists(key, '1', this.config.webhookNonceTtlSeconds);
+    if (!accepted) {
+      throw new ForbiddenException('Duplicate webhook replay detected');
+    }
   }
 
   private getProvider(provider: PaymentProviderName): PaymentProvider {

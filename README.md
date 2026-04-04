@@ -8,7 +8,7 @@ Production-oriented NestJS backend for multi-tenant SMS delivery with JWT auth, 
 - Nginx reverse proxy hardened config (`deploy/nginx/*`)
 - `/metrics` endpoint and in-app business metrics
 - Structured JSON request logs with correlation ID
-- Strict environment validation (fail-fast startup)
+- Strict environment validation with JWT key rotation and webhook replay controls
 - PM2 ecosystem for non-container deployments
 - CI/CD workflow with lint/test/build/prisma/docker/deploy stages
 - Release and operations docs (runbook, incident response, scaling, backups)
@@ -34,3 +34,10 @@ npm run start:dev
 - PM2 fallback: `ecosystem.config.js`
 - Release/ops docs: `docs/`
 - CI/CD: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`
+
+
+## Security hardening updates
+- Rotating JWT key support for access and refresh tokens (`kid` + secret maps via env).
+- Refresh token endpoint: `POST /auth/refresh`.
+- Webhook replay protection with timestamp drift guard + Redis nonce cache.
+- `@CurrentUser()` decorator now supports `@CurrentUser('sub')` style property extraction.

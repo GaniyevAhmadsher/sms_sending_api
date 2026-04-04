@@ -45,6 +45,30 @@ export class AppConfigService {
     return this.env.JWT_SECRET;
   }
 
+  get jwtSecretKid() {
+    return this.env.JWT_SECRET_KID;
+  }
+
+  get jwtSecretByKid() {
+    return this.parseSecretMap(this.env.JWT_SECRET_ROTATION, this.env.JWT_SECRET_KID, this.env.JWT_SECRET);
+  }
+
+  get jwtRefreshSecretKid() {
+    return this.env.JWT_REFRESH_SECRET_KID;
+  }
+
+  get jwtRefreshTtlSeconds() {
+    return this.env.JWT_REFRESH_TTL_SECONDS;
+  }
+
+  get jwtRefreshSecretByKid() {
+    return this.parseSecretMap(
+      this.env.JWT_REFRESH_SECRET_ROTATION,
+      this.env.JWT_REFRESH_SECRET_KID,
+      this.env.JWT_REFRESH_SECRET,
+    );
+  }
+
   get jwtIssuer() {
     return this.env.JWT_ISSUER;
   }
@@ -55,6 +79,14 @@ export class AppConfigService {
 
   get jwtAccessTtlSeconds() {
     return this.env.JWT_ACCESS_TTL_SECONDS;
+  }
+
+  get webhookMaxDriftSeconds() {
+    return this.env.WEBHOOK_MAX_DRIFT_SECONDS;
+  }
+
+  get webhookNonceTtlSeconds() {
+    return this.env.WEBHOOK_NONCE_TTL_SECONDS;
   }
 
   get apiKeyHashSecret() {
@@ -99,5 +131,20 @@ export class AppConfigService {
 
   get otelExporterOtlpEndpoint() {
     return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  }
+
+  private parseSecretMap(rotation: string, primaryKid: string, primarySecret: string) {
+    const entries = rotation
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const [kid, secret] = entry.split(':');
+        return [kid, secret] as const;
+      });
+
+    const map = new Map<string, string>(entries);
+    map.set(primaryKid, primarySecret);
+    return map;
   }
 }
