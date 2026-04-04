@@ -64,20 +64,17 @@ export class AuthService {
     return this.issueTokenPair(user.id);
   }
 
-  private async issueTokenPair(userId: string) {
-    const accessToken = this.tokenService.signAccessToken({ sub: userId });
-    const refreshToken = this.tokenService.signRefreshToken({ sub: userId });
-    const refreshPayload = this.tokenService.verifyRefreshToken(refreshToken);
-    await this.prisma.refreshToken.create({
-      data: {
-        userId,
-        tokenHash: this.tokenService.hashToken(refreshToken),
-        jti: refreshPayload.jti,
-        expiresAt: new Date(refreshPayload.exp * 1000),
-      },
-    });
+  refreshToken(refreshToken: string) {
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
+    return this.issueToken(payload.sub);
+  }
 
-    return { accessToken, refreshToken, tokenType: 'Bearer' };
+  private issueToken(userId: string) {
+    return {
+      accessToken: this.tokenService.sign({ sub: userId }),
+      refreshToken: this.tokenService.signRefreshToken({ sub: userId }),
+      tokenType: 'Bearer',
+    };
   }
 
   private hashPassword(password: string) {

@@ -57,8 +57,24 @@ export class AppConfigService {
     return this.env.JWT_ACCESS_TTL_SECONDS;
   }
 
+  get jwtPreviousSecret() {
+    return this.env.JWT_PREVIOUS_SECRET;
+  }
+
   get jwtRefreshTtlSeconds() {
     return this.env.JWT_REFRESH_TTL_SECONDS;
+  }
+
+  get apiKeyPrefix() {
+    return this.env.API_KEY_PREFIX;
+  }
+
+  get webhookTimestampToleranceSeconds() {
+    return this.env.WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+  }
+
+  get webhookNonceTtlSeconds() {
+    return this.env.WEBHOOK_NONCE_TTL_SECONDS;
   }
 
   get apiKeyHashSecret() {

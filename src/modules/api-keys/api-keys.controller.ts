@@ -1,9 +1,9 @@
-import { Body, Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApiKeysService } from './api-keys.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
+import { ApiKeysService } from './api-keys.service';
 
 @Controller('api-keys')
 @UseGuards(JwtAuthGuard)
@@ -12,7 +12,12 @@ export class ApiKeysController {
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateApiKeyDto) {
-    return this.apiKeysService.create(user.id, dto.label, dto.scopes, dto.expiresInDays);
+    return this.apiKeysService.create(user.id, dto.label, dto.rateLimitRpm);
+  }
+
+  @Get()
+  list(@CurrentUser() user: AuthenticatedUser) {
+    return this.apiKeysService.listMasked(user.id);
   }
 
   @Delete(':id')

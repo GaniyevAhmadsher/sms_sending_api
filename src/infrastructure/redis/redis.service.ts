@@ -28,6 +28,12 @@ export class RedisService {
     return Number(result);
   }
 
+
+  async setIfNotExistsWithExpiry(key: string, value: string, ttlSec: number): Promise<boolean> {
+    const result = await this.sendCommandWithRetry(['SET', key, value, 'EX', String(ttlSec), 'NX'], true);
+    return result === 'OK';
+  }
+
   async lpop(key: string): Promise<string | null> {
     const result = await this.sendCommandWithRetry(['LPOP', key], true);
     return result;

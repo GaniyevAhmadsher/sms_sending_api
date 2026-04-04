@@ -6,7 +6,7 @@ import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import { PaymeProvider } from './providers/payme.provider';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
-import { WebhookSecurityService } from './webhook-security.service';
+import { WebhookReplayProtectionService } from './webhook-replay-protection.service';
 
 @Module({
   imports: [BillingModule, forwardRef(() => QueueModule)],
@@ -20,7 +20,7 @@ import { WebhookSecurityService } from './webhook-security.service';
       inject: [ClickProvider, PaymeProvider],
     },
     PaymentsService,
-    WebhookSecurityService,
+    WebhookReplayProtectionService,
   ],
   exports: [PaymentsService],
 })

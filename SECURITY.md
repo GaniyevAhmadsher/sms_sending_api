@@ -1,12 +1,8 @@
-# Security
+# Security Baseline
 
-- Strict env validation on startup.
-- JWT `iss`/`aud`/ttl fields required.
-- API keys hashed with HMAC secret and configurable prefix.
-- Webhook handlers must enforce signature + dedupe key.
-- Nginx applies secure headers and request rate limiting.
-
-## 2026-04 hardening updates
-- Added rotating refresh tokens persisted in `RefreshToken` table with revocation-on-use.
-- Added API key scopes, expiry support, key prefix + masked return values, and bulk revoke endpoint.
-- Added webhook replay protection using timestamp drift checks + Redis nonce cache.
+- Strict fail-fast env validation at startup.
+- JWT claim enforcement (`iss`,`aud`,`exp`) + previous-secret verification for key rotation.
+- Refresh token flow enabled.
+- API keys use prefixed format (`sms_live_`/`sms_test_`) and hashed-at-rest storage.
+- Webhook replay protection via timestamp drift + nonce TTL cache in Redis.
+- Request correlation IDs and structured logs for auditability.

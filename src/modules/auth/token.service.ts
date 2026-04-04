@@ -8,41 +8,37 @@ interface TokenPayload {
   aud: string;
   iat: number;
   exp: number;
-  jti: string;
-  typ: 'access' | 'refresh';
+  type: 'access' | 'refresh';
 }
 
 @Injectable()
 export class TokenService {
   constructor(private readonly config: AppConfigService) {}
 
-  signAccessToken(payload: { sub: string }) {
-    return this.sign(payload.sub, 'access', this.config.jwtAccessTtlSeconds);
+  sign(payload: { sub: string }) {
+    return this.signToken(payload.sub, 'access', this.config.jwtAccessTtlSeconds);
   }
 
   signRefreshToken(payload: { sub: string }) {
-    return this.sign(payload.sub, 'refresh', this.config.jwtRefreshTtlSeconds);
+    return this.signToken(payload.sub, 'refresh', this.config.jwtRefreshTtlSeconds);
   }
 
-  verifyAccessToken(token: string): TokenPayload {
-    return this.verify(token, 'access');
+  verify(token: string): TokenPayload {
+    return this.verifyToken(token, 'access');
   }
 
   verifyRefreshToken(token: string): TokenPayload {
-    return this.verify(token, 'refresh');
+    return this.verifyToken(token, 'refresh');
   }
 
-  hashToken(token: string): string {
-    return crypto.createHmac('sha256', this.config.jwtSecret).update(token).digest('hex');
-  }
-
-  private sign(sub: string, typ: TokenPayload['typ'], ttlSeconds: number) {
+  private signToken(sub: string, type: 'access' | 'refresh', ttlSeconds: number): string {
     const iat = Math.floor(Date.now() / 1000);
     const exp = iat + ttlSeconds;
     const fullPayload: TokenPayload = {
       sub,
       iat,
       exp,
+      type,
       iss: this.config.jwtIssuer,
       aud: this.config.jwtAudience,
       jti: crypto.randomUUID(),
@@ -56,30 +52,45 @@ export class TokenService {
     return `${data}.${signature}`;
   }
 
-  private verify(token: string, expectedType: TokenPayload['typ']): TokenPayload {
+  private verifyToken(token: string, expectedType: 'access' | 'refresh'): TokenPayload {
     const [header, body, signature] = token.split('.');
     if (!header || !body || !signature) {
       throw new UnauthorizedException('Invalid token');
     }
 
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenPayload;
     const data = `${header}.${body}`;
-    const expected = crypto.createHmac('sha256', this.config.jwtSecret).update(data).digest('base64url');
-    const signatureBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expected);
-    if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+
+    const activeSecret = this.verifySignature(data, signature, this.config.jwtSecret);
+    const rotatedSecret = this.config.jwtPreviousSecret
+      ? this.verifySignature(data, signature, this.config.jwtPreviousSecret)
+      : false;
+
+    if (!activeSecret && !rotatedSecret) {
       throw new UnauthorizedException('Invalid token signature');
     }
 
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenPayload;
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp <= now || payload.iat > now + 10) {
       throw new UnauthorizedException('Token expired or malformed');
     }
 
-    if (payload.iss !== this.config.jwtIssuer || payload.aud !== this.config.jwtAudience || !payload.sub || payload.typ !== expectedType) {
-      throw new UnauthorizedException('Token issuer/audience/type invalid');
+    if (
+      payload.iss !== this.config.jwtIssuer ||
+      payload.aud !== this.config.jwtAudience ||
+      !payload.sub ||
+      payload.type !== expectedType
+    ) {
+      throw new UnauthorizedException('Token claims invalid');
     }
 
     return payload;
+  }
+
+  private verifySignature(data: string, signature: string, secret: string): boolean {
+    const expected = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
   }
 }
