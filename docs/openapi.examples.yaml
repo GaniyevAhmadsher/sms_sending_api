@@ -1,11 +1,23 @@
 openapi: 3.0.3
 info:
-  title: SMS Sending API Examples
+  title: SMS Sending SaaS API
   version: 1.0.0
 paths:
-  /sms/send:
+  /auth/login:
     post:
-      summary: Send SMS
-      responses:
-        '202':
-          description: Accepted
+      summary: Login
+  /auth/refresh:
+    post:
+      summary: Exchange refresh token for new access token
+  /onboarding/api-keys:
+    post:
+      summary: Create API key for tenant workspace
+  /onboarding/webhook-callbacks:
+    post:
+      summary: Register customer callback URL and secret
+  /analytics/daily-usage:
+    get:
+      summary: Daily usage trend for last 30 days
+  /payments/webhook/click:
+    post:
+      summary: Click webhook receiver with replay protection headers

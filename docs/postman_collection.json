@@ -1,7 +1,13 @@
 {
-  "info": {"name": "SMS Sending API", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "info": {
+    "name": "SMS Sending API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
   "item": [
-    {"name": "Health", "request": {"method": "GET", "url": "{{baseUrl}}/health"}},
-    {"name": "Metrics", "request": {"method": "GET", "url": "{{baseUrl}}/metrics"}}
+    {"name": "Auth Login", "request": {"method": "POST", "url": "{{baseUrl}}/auth/login"}},
+    {"name": "Auth Refresh", "request": {"method": "POST", "url": "{{baseUrl}}/auth/refresh"}},
+    {"name": "Create API Key", "request": {"method": "POST", "url": "{{baseUrl}}/onboarding/api-keys"}},
+    {"name": "Send SMS", "request": {"method": "POST", "url": "{{baseUrl}}/sms/send"}},
+    {"name": "Daily Usage", "request": {"method": "GET", "url": "{{baseUrl}}/analytics/daily-usage"}}
   ]
 }
