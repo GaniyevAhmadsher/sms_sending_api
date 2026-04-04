@@ -41,6 +41,8 @@ export class TokenService {
       type,
       iss: this.config.jwtIssuer,
       aud: this.config.jwtAudience,
+      jti: crypto.randomUUID(),
+      typ,
     };
 
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');

@@ -13,8 +13,8 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = authorization.slice(7);
-    const payload = this.tokenService.verify(token);
-    request.user = { id: payload.sub };
+    const payload = this.tokenService.verifyAccessToken(token);
+    request.user = { id: payload.sub, sub: payload.sub };
     return true;
   }
 }

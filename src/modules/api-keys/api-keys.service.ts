@@ -20,6 +20,7 @@ export class ApiKeysService {
 
     const rawKey = `${this.config.apiKeyPrefix}${crypto.randomBytes(24).toString('hex')}`;
     const keyHash = this.hashApiKey(rawKey);
+    const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 86400000) : null;
 
     const apiKey = await this.prisma.apiKey.create({
       data: {
@@ -46,9 +47,7 @@ export class ApiKeysService {
 
   async revoke(userId: string, id: string) {
     const apiKey = await this.prisma.apiKey.findFirst({ where: { id, userId } });
-    if (!apiKey) {
-      throw new NotFoundException('API key not found');
-    }
+    if (!apiKey) throw new NotFoundException('API key not found');
 
     return this.prisma.apiKey.update({
       where: { id },
