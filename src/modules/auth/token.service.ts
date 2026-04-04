@@ -45,10 +45,12 @@ export class TokenService {
       typ,
     };
 
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const header: JwtHeader = { alg: 'HS256', typ: 'JWT', kid };
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
     const body = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
-    const data = `${header}.${body}`;
-    const signature = crypto.createHmac('sha256', this.config.jwtSecret).update(data).digest('base64url');
+    const data = `${encodedHeader}.${body}`;
+    const secret = this.secretForKid(kid, typ);
+    const signature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
     return `${data}.${signature}`;
   }
 

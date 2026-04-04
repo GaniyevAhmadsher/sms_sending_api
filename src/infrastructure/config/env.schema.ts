@@ -43,6 +43,22 @@ function num(name: string, fallback?: number): number {
   return value;
 }
 
+function parseRotation(raw: string): string {
+  const items = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const item of items) {
+    const [kid, secret] = item.split(':');
+    if (!kid || !secret || secret.length < 32) {
+      throw new Error('JWT rotation values must be formatted as kid:secret and secret should be >=32 chars');
+    }
+  }
+
+  return items.join(',');
+}
+
 export function parseEnv(): EnvSchema {
   const nodeEnv = (process.env.NODE_ENV ?? 'development') as EnvSchema['NODE_ENV'];
   const logLevel = (process.env.LOG_LEVEL ?? 'info') as EnvSchema['LOG_LEVEL'];

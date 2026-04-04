@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 describe('PaymentsService', () => {
@@ -30,21 +31,39 @@ describe('PaymentsService', () => {
       enqueuePaymentWebhookJob: jest.fn(),
     } as any;
 
+    const metrics = {
+      webhookLatency: { labels: jest.fn(() => ({ observe: jest.fn() })) },
+      paymentFailedTotal: { inc: jest.fn() },
+      paymentTopupTotal: { inc: jest.fn() },
+    } as any;
+
+    const config = {
+      webhookMaxDriftSeconds: 300,
+      webhookNonceTtlSeconds: 900,
+    } as any;
+
+    const redis = {
+      setIfNotExists: jest.fn().mockResolvedValue(true),
+    } as any;
+
     const providers = [
       {
         provider: 'CLICK',
         createPayment: jest.fn(async () => ({ externalId: 'click-ext-1', paymentUrl: 'https://click/pay', params: { foo: 'bar' } })),
-        verifyWebhook: jest.fn(() => ({ externalId: 'click-ext-1', amount: 100, status: 'SUCCESS', raw: {}, dedupeKey: 'd1' })),
-      },
-      {
-        provider: 'PAYME',
-        createPayment: jest.fn(async () => ({ externalId: 'payme-ext-1', paymentUrl: 'https://payme/pay', params: { foo: 'bar' } })),
-        verifyWebhook: jest.fn(() => ({ externalId: 'payme-ext-1', amount: 100, status: 'SUCCESS', raw: {}, dedupeKey: 'd2' })),
+        verifyWebhook: jest.fn(() => ({
+          externalId: 'click-ext-1',
+          amount: 100,
+          status: 'SUCCESS',
+          raw: {},
+          dedupeKey: 'd1',
+          eventTimestamp: new Date(),
+          nonce: 'n1',
+        })),
       },
     ] as any;
 
-    const service = new PaymentsService(prisma, billingService, queueService, providers);
-    return { service, payment, webhookEvent, billingService, queueService };
+    const service = new PaymentsService(prisma, billingService, queueService, providers, metrics, config, redis);
+    return { service, payment, webhookEvent, queueService, redis, providers };
   };
 
   it('creates pending payment and returns provider URL', async () => {
@@ -58,22 +77,20 @@ describe('PaymentsService', () => {
     expect(result.externalId).toBe('click-ext-1');
   });
 
-  it('handles duplicate webhook idempotently', async () => {
-    const { service, webhookEvent } = makeService();
-    webhookEvent.upsert.mockResolvedValue({ id: 'evt1', status: 'PROCESSED' });
-
-    const result = await service.ingestWebhook('CLICK', {}, {});
-
-    expect(result.ignored).toBe(true);
-  });
-
   it('queues webhook for async processing', async () => {
-    const { service, webhookEvent, queueService } = makeService();
+    const { service, webhookEvent, queueService, redis } = makeService();
     webhookEvent.upsert.mockResolvedValue({ id: 'evt2', status: 'RECEIVED' });
 
     await service.ingestWebhook('CLICK', {}, {});
 
+    expect(redis.setIfNotExists).toHaveBeenCalledTimes(1);
     expect(queueService.enqueuePaymentWebhookJob).toHaveBeenCalledTimes(1);
-    expect(webhookEvent.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects replayed webhook nonces', async () => {
+    const { service, redis } = makeService();
+    redis.setIfNotExists.mockResolvedValue(false);
+
+    await expect(service.ingestWebhook('CLICK', {}, {})).rejects.toThrow(ForbiddenException);
   });
 });

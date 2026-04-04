@@ -39,6 +39,11 @@ export class RedisService {
     return result;
   }
 
+  async setIfNotExists(key: string, value: string, ttlSec: number): Promise<boolean> {
+    const response = await this.sendCommandWithRetry(['SET', key, value, 'EX', String(ttlSec), 'NX'], true);
+    return response === 'OK';
+  }
+
   private async sendCommandWithRetry(args: string[], allowNullBulk = false): Promise<string | null> {
     const maxAttempts = 3;
     let lastError: unknown;

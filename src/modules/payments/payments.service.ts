@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { QueueService } from '../queue/queue.service';
@@ -63,6 +63,9 @@ export class PaymentsService {
     const provider = this.getProvider(providerName);
     await this.replayProtection.validate(providerName, headers, body);
     const payload = provider.verifyWebhook(headers, body);
+
+    this.assertWebhookTimestamp(payload);
+    await this.assertWebhookNonce(providerName, payload);
 
     const event = await this.prisma.webhookEvent.upsert({
       where: { dedupeKey: payload.dedupeKey },

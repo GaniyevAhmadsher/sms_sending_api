@@ -45,6 +45,30 @@ export class AppConfigService {
     return this.env.JWT_SECRET;
   }
 
+  get jwtSecretKid() {
+    return this.env.JWT_SECRET_KID;
+  }
+
+  get jwtSecretByKid() {
+    return this.parseSecretMap(this.env.JWT_SECRET_ROTATION, this.env.JWT_SECRET_KID, this.env.JWT_SECRET);
+  }
+
+  get jwtRefreshSecretKid() {
+    return this.env.JWT_REFRESH_SECRET_KID;
+  }
+
+  get jwtRefreshTtlSeconds() {
+    return this.env.JWT_REFRESH_TTL_SECONDS;
+  }
+
+  get jwtRefreshSecretByKid() {
+    return this.parseSecretMap(
+      this.env.JWT_REFRESH_SECRET_ROTATION,
+      this.env.JWT_REFRESH_SECRET_KID,
+      this.env.JWT_REFRESH_SECRET,
+    );
+  }
+
   get jwtIssuer() {
     return this.env.JWT_ISSUER;
   }

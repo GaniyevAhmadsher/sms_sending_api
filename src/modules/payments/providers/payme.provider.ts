@@ -49,12 +49,16 @@ export class PaymeProvider implements PaymentProvider {
     const expected = createHmac('sha256', this.config.paymeSecretKey).update(base).digest('hex');
     this.assertSignature(expected, signature);
 
+    const eventTimestamp = this.parseTimestamp(timestamp);
+
     return {
       externalId,
       amount,
       status: this.mapStatus(eventStatus),
       raw: body as Record<string, unknown>,
       dedupeKey: `payme:${externalId}:${eventStatus}:${timestamp}`,
+      eventTimestamp,
+      nonce: `${externalId}:${timestamp}`,
     };
   }
 
@@ -71,6 +75,20 @@ export class PaymeProvider implements PaymentProvider {
     if (expectedBuffer.length !== receivedBuffer.length || !timingSafeEqual(expectedBuffer, receivedBuffer)) {
       throw new ForbiddenException('Invalid Payme signature');
     }
+  }
+
+  private parseTimestamp(raw: string): Date {
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) {
+      return new Date(numeric > 10_000_000_000 ? numeric : numeric * 1000);
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new ForbiddenException('Invalid webhook timestamp');
+    }
+
+    return parsed;
   }
 
   private extractSignature(headers: Record<string, string | string[] | undefined>, body: any): string {
