@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -18,13 +19,19 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('refresh')
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
   @Post('google')
   google(@Body() dto: GoogleLoginDto) {
     return this.authService.googleLogin(dto.idToken);
   }
+
   @Post('refresh')
   refresh(@Body() dto: { refreshToken: string }) {
-    return this.authService.refresh(dto.refreshToken);
+    return this.authService.refreshToken(dto.refreshToken);
   }
 }
 

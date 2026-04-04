@@ -81,8 +81,20 @@ export class AppConfigService {
     return this.env.JWT_ACCESS_TTL_SECONDS;
   }
 
-  get webhookMaxDriftSeconds() {
-    return this.env.WEBHOOK_MAX_DRIFT_SECONDS;
+  get jwtPreviousSecret() {
+    return this.env.JWT_PREVIOUS_SECRET;
+  }
+
+  get jwtRefreshTtlSeconds() {
+    return this.env.JWT_REFRESH_TTL_SECONDS;
+  }
+
+  get apiKeyPrefix() {
+    return this.env.API_KEY_PREFIX;
+  }
+
+  get webhookTimestampToleranceSeconds() {
+    return this.env.WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
   }
 
   get webhookNonceTtlSeconds() {
@@ -91,6 +103,10 @@ export class AppConfigService {
 
   get apiKeyHashSecret() {
     return this.env.API_KEY_HASH_SECRET;
+  }
+
+  get apiKeyPrefix() {
+    return this.env.API_KEY_PREFIX;
   }
 
   get smsProvider() {
@@ -133,18 +149,11 @@ export class AppConfigService {
     return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   }
 
-  private parseSecretMap(rotation: string, primaryKid: string, primarySecret: string) {
-    const entries = rotation
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const [kid, secret] = entry.split(':');
-        return [kid, secret] as const;
-      });
+  get webhookMaxDriftSeconds() {
+    return this.env.WEBHOOK_MAX_DRIFT_SECONDS;
+  }
 
-    const map = new Map<string, string>(entries);
-    map.set(primaryKid, primarySecret);
-    return map;
+  get webhookNonceTtlSeconds() {
+    return this.env.WEBHOOK_NONCE_TTL_SECONDS;
   }
 }

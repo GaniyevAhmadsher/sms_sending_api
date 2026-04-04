@@ -5,7 +5,9 @@
 - Protect `/metrics` and admin endpoints behind network policy.
 - Rotate secrets quarterly and after incidents.
 
-## 2026-04 hardening increment
-- Added access/refresh JWT key rotation (`JWT_SECRET_ROTATION`, `JWT_REFRESH_SECRET_ROTATION`) and `kid` validation.
-- Added `/auth/refresh` flow for controlled token renewal.
-- Added webhook replay defense via timestamp drift (`WEBHOOK_MAX_DRIFT_SECONDS`) and Redis nonce TTL cache (`WEBHOOK_NONCE_TTL_SECONDS`).
+
+## Webhook Replay Protection
+- Incoming payment webhooks must provide `x-webhook-timestamp` (unix seconds).
+- Optional `x-webhook-nonce` is recommended; when omitted, server derives a deterministic fingerprint.
+- Nonces are cached in Redis using `SET NX EX` and duplicates are rejected.
+- Requests exceeding `WEBHOOK_MAX_DRIFT_SECONDS` are rejected to block delayed replay attempts.

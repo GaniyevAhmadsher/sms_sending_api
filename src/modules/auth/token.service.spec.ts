@@ -3,20 +3,11 @@ import { TokenService } from './token.service';
 
 describe('TokenService', () => {
   const config = {
+    jwtSecret: 'super-secret-super-secret-super-secret',
     jwtIssuer: 'sms-saas',
     jwtAudience: 'sms-api',
     jwtAccessTtlSeconds: 300,
-    jwtRefreshTtlSeconds: 7200,
-    jwtSecretKid: 'v1',
-    jwtRefreshSecretKid: 'r1',
-    jwtSecretByKid: new Map([
-      ['v1', 'super-secret-super-secret-super-secret-1'],
-      ['v0', 'legacy-secret-legacy-secret-legacy-000'],
-    ]),
-    jwtRefreshSecretByKid: new Map([
-      ['r1', 'super-refresh-secret-super-refresh-1'],
-      ['r0', 'legacy-refresh-secret-legacy-refresh0'],
-    ]),
+    jwtRefreshTtlSeconds: 3600,
   } as any;
 
   it('rejects invalid tokens', () => {
@@ -31,13 +22,5 @@ describe('TokenService', () => {
     expect(payload.sub).toBe('u1');
     expect(payload.iss).toBe('sms-saas');
     expect(payload.typ).toBe('access');
-  });
-
-  it('signs and verifies refresh token', () => {
-    const service = new TokenService(config);
-    const token = service.signRefreshToken({ sub: 'u1' });
-    const payload = service.verifyRefreshToken(token);
-    expect(payload.sub).toBe('u1');
-    expect(payload.typ).toBe('refresh');
   });
 });

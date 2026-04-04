@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { ApiKeysService } from '../api-keys.service';
 
@@ -18,9 +13,7 @@ export class ApiKeyGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const apiKey = request.headers['x-api-key'];
 
-    if (!apiKey || typeof apiKey !== 'string') {
-      throw new UnauthorizedException('Missing API key');
-    }
+    if (!apiKey || typeof apiKey !== 'string') throw new UnauthorizedException('Missing API key');
 
     let keyHash: string;
     try {
@@ -29,26 +22,18 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Invalid API key');
     }
 
-    const candidate = await this.prisma.apiKey.findFirst({
-      where: { keyHash, status: 'ACTIVE' },
-      include: { user: true },
-    });
-
-    if (!candidate) {
-      throw new UnauthorizedException('Invalid API key');
+    const candidate = await this.prisma.apiKey.findFirst({ where: { keyHash, status: 'ACTIVE' }, include: { user: true } });
+    if (!candidate) throw new UnauthorizedException('Invalid API key');
+    if (candidate.expiresAt && candidate.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('API key expired');
+    }
+    if (!candidate.scopes.includes('sms:send')) {
+      throw new UnauthorizedException('API key missing required scope');
     }
 
-    request.user = {
-      id: candidate.user.id,
-      email: candidate.user.email,
-      apiKeyId: candidate.id,
-    };
+    request.user = { id: candidate.user.id, email: candidate.user.email, apiKeyId: candidate.id, sub: candidate.user.id };
 
-    await this.prisma.apiKey.update({
-      where: { id: candidate.id },
-      data: { lastUsedAt: new Date() },
-    });
-
+    await this.prisma.apiKey.update({ where: { id: candidate.id }, data: { lastUsedAt: new Date() } });
     return true;
   }
 }
