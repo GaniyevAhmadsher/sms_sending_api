@@ -81,6 +81,10 @@ export class AppConfigService {
     return this.env.API_KEY_HASH_SECRET;
   }
 
+  get apiKeyPrefix() {
+    return this.env.API_KEY_PREFIX;
+  }
+
   get smsProvider() {
     return this.env.SMS_PROVIDER;
   }
@@ -119,5 +123,13 @@ export class AppConfigService {
 
   get otelExporterOtlpEndpoint() {
     return this.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  }
+
+  get webhookMaxDriftSeconds() {
+    return this.env.WEBHOOK_MAX_DRIFT_SECONDS;
+  }
+
+  get webhookNonceTtlSeconds() {
+    return this.env.WEBHOOK_NONCE_TTL_SECONDS;
   }
 }

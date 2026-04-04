@@ -26,6 +26,8 @@ export interface EnvSchema {
   OTEL_ENABLED: 'true' | 'false';
   OTEL_SERVICE_NAME: string;
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+  WEBHOOK_MAX_DRIFT_SECONDS: number;
+  WEBHOOK_NONCE_TTL_SECONDS: number;
 }
 
 function req(name: string): string {
@@ -73,6 +75,8 @@ export function parseEnv(): EnvSchema {
     OTEL_ENABLED: process.env.OTEL_ENABLED === 'true' ? 'true' : 'false',
     OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME ?? 'sms-sending-api',
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    WEBHOOK_MAX_DRIFT_SECONDS: num('WEBHOOK_MAX_DRIFT_SECONDS', 300),
+    WEBHOOK_NONCE_TTL_SECONDS: num('WEBHOOK_NONCE_TTL_SECONDS', 900),
   };
 
   if (!['development', 'test', 'staging', 'production'].includes(env.NODE_ENV)) {

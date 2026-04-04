@@ -61,6 +61,7 @@ export class PaymentsService {
     const startedAt = process.hrtime.bigint();
     await this.validateWebhookReplay(headers);
     const provider = this.getProvider(providerName);
+    await this.replayProtection.validate(providerName, headers, body);
     const payload = provider.verifyWebhook(headers, body);
 
     const event = await this.prisma.webhookEvent.upsert({
