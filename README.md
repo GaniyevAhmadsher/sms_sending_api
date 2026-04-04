@@ -9,6 +9,7 @@ Production-oriented NestJS backend for multi-tenant SMS delivery with JWT auth, 
 - `/metrics` endpoint and in-app business metrics
 - Structured JSON request logs with correlation ID
 - Strict environment validation (fail-fast startup)
+- Webhook replay protection (timestamp drift + nonce cache in Redis)
 - PM2 ecosystem for non-container deployments
 - CI/CD workflow with lint/test/build/prisma/docker/deploy stages
 - Release and operations docs (runbook, incident response, scaling, backups)
@@ -24,6 +25,7 @@ npm run start:dev
 - `POST /sms/send` requires `x-api-key` header.
 - Dashboard-like endpoints (`/users/me`, `/billing/*`, `/analytics/*`, `/payments/create`, `/payments/history`) use JWT bearer auth.
 - Webhook endpoints are public but strictly signature-validated: `/payments/webhook/click`, `/payments/webhook/payme`.
+- Webhooks must include `x-webhook-timestamp` and should include `x-webhook-nonce` for replay safety.
 
 
 ## Production readiness assets

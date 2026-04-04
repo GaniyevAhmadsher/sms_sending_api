@@ -5,6 +5,7 @@ import { QueueService } from '../queue/queue.service';
 import { PAYMENT_PROVIDERS } from './providers/payment.constants';
 import type { PaymentProvider, PaymentProviderName, VerifiedWebhook } from './providers/payment-provider.interface';
 import { MetricsService } from '../../infrastructure/metrics/metrics.service';
+import { WebhookReplayProtectionService } from './webhook-replay-protection.service';
 
 @Injectable()
 export class PaymentsService {
@@ -16,6 +17,7 @@ export class PaymentsService {
     @Inject(forwardRef(() => QueueService)) private readonly queueService: QueueService,
     @Inject(PAYMENT_PROVIDERS) providers: PaymentProvider[],
     private readonly metrics: MetricsService,
+    private readonly replayProtection: WebhookReplayProtectionService,
   ) {
     this.providers = providers;
   }
@@ -56,6 +58,7 @@ export class PaymentsService {
   async ingestWebhook(providerName: PaymentProviderName, headers: Record<string, string | string[] | undefined>, body: any) {
     const startedAt = process.hrtime.bigint();
     const provider = this.getProvider(providerName);
+    await this.replayProtection.validate(providerName, headers, body);
     const payload = provider.verifyWebhook(headers, body);
 
     const event = await this.prisma.webhookEvent.upsert({
